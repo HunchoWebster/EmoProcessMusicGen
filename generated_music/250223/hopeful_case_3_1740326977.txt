@@ -1,0 +1,3 @@
+Input: 尽管前路艰辛，我对明天依然满怀信心
+Generated Prompt: Inspiring, upbeat melody with driving rhythm, starting with minor chords for a touch of the journey's challenges, then transitioning to major chords and soaring crescendos to convey unwavering confidence in tomorrow.
+Expected Params: {'emotion': '希望', 'valence': 7, 'arousal': 4}

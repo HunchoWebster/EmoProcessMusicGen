@@ -1,0 +1,3 @@
+Input: 持续三个月的抑郁状态，感觉生活失去色彩
+Generated Prompt: Slow, minor key chords gradually transitioning to major, with a gentle melody that starts somber and becomes more uplifting over three months, representing the journey from depressive state to finding color in life.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

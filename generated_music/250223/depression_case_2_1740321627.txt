@@ -1,0 +1,3 @@
+Input: 阴沉的天气与内心的孤独，让我陷入深深的抑郁
+Generated Prompt: Slow, minor key piano melody with soft strings, gradually introducing gentle, major key accents to lift the cloud of deep depression and loneliness.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

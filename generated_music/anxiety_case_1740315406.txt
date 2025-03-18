@@ -1,0 +1,3 @@
+Input: 明天有重要演讲，心跳加速坐立不安
+Generated Prompt: A fast-paced, anxious intro with a thumping heartbeat rhythm, gradually transitioning to a smooth, calming melody with a slower tempo, incorporating gentle wind instrument tones to soothe nerves and end with a confident, steady cadence.
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

@@ -1,0 +1,3 @@
+Input: 收到梦想公司的offer，兴奋得睡不着觉
+Generated Prompt: Upbeat electronic dance music with soaring synths, driving beats, and triumphant melodies to amplify excitement.
+Expected Params: {'emotion': '快乐', 'valence': 8, 'arousal': 7}

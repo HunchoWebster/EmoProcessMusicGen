@@ -1,0 +1,3 @@
+Input: 明天有重要演讲，心跳加速坐立不安
+Generated Prompt: a high - energy, upbeat track with a pulsating rhythm to match a nervous yet determined mood, featuring driving percussion and soaring synths
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

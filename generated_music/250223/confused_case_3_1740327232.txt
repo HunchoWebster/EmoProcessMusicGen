@@ -1,0 +1,3 @@
+Input: 站在人生的十字路口，我不知道该迈向哪个方向
+Generated Prompt: A contemplative piece with a slow tempo, starting with a solo piano playing a hesitant melody. As the music progresses, strings gradually join, adding a sense of longing. Towards the end, a gentle wind instrument enters, introducing a hint of optimism about the unknown path ahead.
+Expected Params: {'emotion': '困惑', 'valence': 4, 'arousal': 5}

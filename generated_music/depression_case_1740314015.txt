@@ -1,0 +1,3 @@
+Input: 持续三个月的抑郁状态，感觉生活失去色彩
+Generated Prompt: A slow and somber piano melody with minor chords at the start, gradually introducing gentle strings. As the music progresses, the tempo picks up slightly, and major chords are subtly interwoven, adding a glimmer of hope. Percussion elements like soft tambourine shakes enter, gradually building in intensity to create a sense of movement towards a more vibrant and colorful musical landscape.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

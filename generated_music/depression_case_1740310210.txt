@@ -1,0 +1,3 @@
+Input: 持续三个月的抑郁状态，感觉生活失去色彩
+Generated Prompt: a somber and melancholic piece with slow, minor-key melodies and subdued instrumentation that reflects months of depressive feelings and a colorless life
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

@@ -1,0 +1,3 @@
+Input: 在高压环境中，我不断感受到强烈的焦虑与紧张
+Generated Prompt: High-pressure environment with intense anxiety and tension. A slow, minor-key piano piece gradually adds calming wind instruments and a steady, gentle drumbeat to ease the anxiety and transform it into a more composed state.
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

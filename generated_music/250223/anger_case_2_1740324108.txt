@@ -1,0 +1,3 @@
+Input: 在激烈争执中，我几乎无法控制内心的怒火
+Generated Prompt: Angry outburst in a heated argument. Start with intense, dissonant chords, then gradually introduce calming, slow-paced melodies with smooth transitions to soothe the rage.
+Expected Params: {'emotion': '愤怒', 'valence': 3, 'arousal': 8}

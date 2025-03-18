@@ -1,0 +1,3 @@
+Input: 明天有重要演讲，心跳加速坐立不安
+Generated Prompt: 紧张心跳加速的明日演讲准备，以舒缓弦乐开场，伴随轻快鼓点逐渐增强，加入明亮高音旋律，助你放松并充满自信。
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

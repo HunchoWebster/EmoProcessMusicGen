@@ -1,0 +1,3 @@
+Input: 面对前路的未知和不确定性，我感到无比迷茫和困惑
+Generated Prompt: A somber piano intro with slow, wandering melodies, gradually introducing gentle strings and a soft, steady rhythm to bring clarity and a sense of direction through the musical journey of facing the unknown.
+Expected Params: {'emotion': '困惑', 'valence': 4, 'arousal': 5}

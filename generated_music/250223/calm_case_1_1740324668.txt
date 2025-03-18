@@ -1,0 +1,3 @@
+Input: 夜深人静时，我静静欣赏着窗外的月光，感受到内心的平静
+Generated Prompt: A serene nocturnal piece with gentle piano chords mimicking the moonlight's soft glow, gradually evolving into a warm, embracing melody that deepens the sense of inner peace.
+Expected Params: {'emotion': '平静', 'valence': 7, 'arousal': 2}

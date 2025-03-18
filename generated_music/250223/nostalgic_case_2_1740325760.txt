@@ -1,0 +1,3 @@
+Input: 翻看旧日照片，让我沉浸在温馨而久远的记忆中
+Generated Prompt: Soft, nostalgic piano melody with warm strings, gradually building in intensity to evoke the depth of cherished memories from old photos.
+Expected Params: {'emotion': '怀旧', 'valence': 6, 'arousal': 3}

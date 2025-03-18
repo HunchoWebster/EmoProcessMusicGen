@@ -1,0 +1,3 @@
+Input: 连续的失败和失望让我觉得世界一片黑暗
+Generated Prompt: A slow, minor key piano piece starting with despairing low notes, gradually introducing glimmers of hope through rising chords and a brighter melody.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

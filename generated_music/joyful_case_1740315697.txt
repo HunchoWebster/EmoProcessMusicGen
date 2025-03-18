@@ -1,0 +1,3 @@
+Input: 收到梦想公司的offer，兴奋得睡不着觉
+Generated Prompt: Euphoric celebration with upbeat tempo, bright major chords, and energetic percussion to enhance the excitement of landing a dream job offer.
+Expected Params: {'emotion': '快乐', 'valence': 8, 'arousal': 7}

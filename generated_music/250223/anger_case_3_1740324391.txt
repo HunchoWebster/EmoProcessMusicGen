@@ -1,0 +1,3 @@
+Input: 面对持续的不正义，我的心中燃起了熊熊怒焰
+Generated Prompt: Angry fire fueled by ongoing injustice, gradually transitioning to a determined and resolute rhythm with powerful beats and soaring melodies that channel the anger into a force for change.
+Expected Params: {'emotion': '愤怒', 'valence': 3, 'arousal': 8}

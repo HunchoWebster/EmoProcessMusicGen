@@ -1,0 +1,3 @@
+Input: 清晨的鸟鸣与柔和的阳光让我心情彻底平复
+Generated Prompt: Morning birdsong and gentle sunlight in a peaceful, ambient track with rising melodies to enhance the calming mood
+Expected Params: {'emotion': '平静', 'valence': 7, 'arousal': 2}

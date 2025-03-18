@@ -1,0 +1,3 @@
+Input: 今天得知了一个好消息，整个人都充满无限喜悦
+Generated Prompt: Upbeat and energetic pop music with bright melodies, soaring vocals, and a driving rhythm to fully embrace and amplify the boundless joy.
+Expected Params: {'emotion': '快乐', 'valence': 8, 'arousal': 7}
