@@ -1,0 +1,3 @@
+Input: 收到梦想公司的offer，兴奋得睡不着觉
+Generated Prompt: an upbeat and energetic track with driving rhythms, triumphant horns, and soaring synths to convey the excitement of receiving a dream job offer
+Expected Params: {'emotion': '快乐', 'valence': 8, 'arousal': 7}

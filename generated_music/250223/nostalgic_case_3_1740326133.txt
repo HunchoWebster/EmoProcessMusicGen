@@ -1,0 +1,3 @@
+Input: 悠扬的老歌唤起了我深藏心底的往日回忆
+Generated Prompt: Soft, nostalgic old - school tune with warm chords evoking deep - seated past memories, gradually building in intensity to stir up a sense of longing and then gently subsiding into a peaceful reprise.
+Expected Params: {'emotion': '怀旧', 'valence': 6, 'arousal': 3}

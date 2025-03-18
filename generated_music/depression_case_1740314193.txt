@@ -1,0 +1,3 @@
+Input: 持续三个月的抑郁状态，感觉生活失去色彩
+Generated Prompt: A slow - tempo, minor - key melody at first, with soft piano chords like those in Chopin's Nocturnes. As it progresses, introduce gentle strings that gradually build in volume, with a touch of major - key undertones emerging, perhaps a rising scale. The rhythm starts with a steady, plodding beat but slowly transforms into a more upbeat, syncopated rhythm, like a hesitant step turning into a confident stride, as if hope is gradually returning and life is regaining its color.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

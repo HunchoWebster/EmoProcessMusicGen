@@ -1,0 +1,3 @@
+Input: 明天有重要演讲，心跳加速坐立不安
+Generated Prompt: an intense and energetic track with a driving rhythm to match your racing heart and restlessness
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

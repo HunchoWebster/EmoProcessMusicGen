@@ -1,0 +1,3 @@
+Input: 遭遇背叛和不公正待遇，我内心充满了愤怒与不满
+Generated Prompt: Angry and resentful due to betrayal and injustice. Start with intense, driving rhythms, distorted guitars for anger. Then, introduce a slow, minor-key piano melody with dissonant chords to maintain the unease. As the music progresses, incorporate a gradual build-up of orchestral elements like horns and strings, eventually resolving into a triumphant major-key section with soaring melodies to transform anger into a sense of justice and empowerment.
+Expected Params: {'emotion': '愤怒', 'valence': 3, 'arousal': 8}

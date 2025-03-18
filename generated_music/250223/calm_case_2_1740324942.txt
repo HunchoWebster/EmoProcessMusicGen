@@ -1,0 +1,3 @@
+Input: 在湖边静坐，微风拂过，我感到无比的放松与安宁
+Generated Prompt: Peaceful lakeside breeze, gentle and calming melody with soft chords and a slow tempo, gradually adding light, airy elements to enhance the sense of relaxation and tranquility.
+Expected Params: {'emotion': '平静', 'valence': 7, 'arousal': 2}

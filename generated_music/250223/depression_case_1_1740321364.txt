@@ -1,0 +1,3 @@
+Input: 持续三个月的抑郁状态，感觉生活失去色彩
+Generated Prompt: Slow, minor key melody with a gradually rising tempo and shifting to major key over three months to bring a sense of hope and color back to life.
+Expected Params: {'emotion': '悲伤', 'valence': 2, 'arousal': 3}

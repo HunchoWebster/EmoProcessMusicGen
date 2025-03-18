@@ -1,0 +1,3 @@
+Input: 明天有重要演讲，心跳加速坐立不安
+Generated Prompt: 紧张心跳下的舒缓演讲序曲，从轻快前奏渐入沉稳节奏，以平和旋律缓解坐立不安，最终在激昂高潮中自信收尾。
+Expected Params: {'emotion': '恐惧', 'valence': 4, 'arousal': 8}

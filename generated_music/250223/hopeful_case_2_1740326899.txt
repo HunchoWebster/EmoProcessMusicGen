@@ -1,0 +1,3 @@
+Input: 在逆境中，我看到了前方的一线光明
+Generated Prompt: In adversity, a glimmer of hope emerges. A slow, minor-key intro builds tension, then a major-key melody with ascending notes and bright chords represents the emerging light.
+Expected Params: {'emotion': '希望', 'valence': 7, 'arousal': 4}

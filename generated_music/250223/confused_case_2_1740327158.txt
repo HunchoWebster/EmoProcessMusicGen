@@ -1,0 +1,3 @@
+Input: 在每个抉择点上，我都感到前所未有的迷失
+Generated Prompt: A song that starts with hesitant, wandering melodies reflecting confusion at decision points, gradually adding guiding, resolute notes to bring clarity and direction.
+Expected Params: {'emotion': '困惑', 'valence': 4, 'arousal': 5}
