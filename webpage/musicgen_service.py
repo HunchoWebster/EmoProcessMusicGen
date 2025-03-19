@@ -5,6 +5,8 @@ import soundfile as sf
 from pathlib import Path
 import time
 import os
+import json
+import re
 from openai import OpenAI
 from audiocraft.models import MusicGen
 from audiocraft.models import MultiBandDiffusion
@@ -62,14 +64,14 @@ class MusicGenService:
         
     def _setup_logging(self):
         """设置日志"""
-        # 设置更高的日志级别以抑制警告
+        # 将日志级别改为 INFO 以显示详细信息
         logging.basicConfig(
-            level=logging.ERROR,  # 将日志级别改为 ERROR
+            level=logging.INFO,  # 从 ERROR 改为 INFO
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
         
-        # 抑制其他库的日志
+        # 修改其他库的日志级别，但保持主要日志为 INFO
         logging.getLogger('torch').setLevel(logging.ERROR)
         logging.getLogger('audiocraft').setLevel(logging.ERROR)
         logging.getLogger('transformers').setLevel(logging.ERROR)
@@ -106,49 +108,151 @@ class MusicGenService:
     
     def create_prompt(self, emotion_text: str) -> Optional[str]:
         """
-        根据情绪描述生成音乐提示词
+        Generate music prompt based on emotional description
         
         Args:
-            emotion_text: 情绪描述文本
+            emotion_text: Emotional description text
             
         Returns:
-            Optional[str]: 生成的提示词，失败则返回None
+            Optional[str]: Generated prompt, returns None if failed
         """
         if not self.api_key:
-            self.logger.error("未设置API密钥")
+            self.logger.error("API key not set")
             return None
             
         try:
+            self.logger.info(f"开始调用 API，输入文本: {emotion_text}")
+            
             client = OpenAI(
                 api_key=self.api_key,
                 base_url="https://ark.cn-beijing.volces.com/api/v3"
             )
             
+            # 记录完整的请求消息
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional music therapy prompt generator. Your task is to analyze the user's emotional description "
+                        "and generate two parts:\n"
+                        "1. Emotion Label: Identify the primary emotion type from the user's description\n"
+                        "2. Music Prompt: Generate a detailed English music generation prompt\n\n"
+                        "You must respond with ONLY a valid JSON object in the following format:\n"
+                        "{\n"
+                        '  "emotion_label": "emotion label",\n'
+                        '  "music_prompt": "music generation prompt"\n'
+                        "}\n\n"
+                        "The emotion label must be exactly one of: anxiety, depression, insomnia, stress, distraction, pain, trauma\n"
+                        "The music prompt must:\n"
+                        "- Be in English\n"
+                        "- Include specific musical elements (rhythm, timbre, melodic features, etc.)\n"
+                        "- Target emotional regulation goals\n"
+                        "- Be concise and clear\n"
+                        "- Not exceed 150 characters\n\n"
+                        "Example valid response:\n"
+                        "{\n"
+                        '  "emotion_label": "anxiety",\n'
+                        '  "music_prompt": "Calm ambient music with gentle piano melodies, soft strings, and slow tempo around 60 BPM"\n'
+                        "}"
+                    )
+                },
+                {"role": "user", "content": emotion_text}
+            ]
+            
+            self.logger.info("API 请求消息:")
+            self.logger.info(f"System: {messages[0]['content']}")
+            self.logger.info(f"User: {messages[1]['content']}")
+            
             completion = client.chat.completions.create(
                 model="ep-20250220214537-p7622",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a music prompt generator for a music generation model called 'musicgen'. "
-                            "Your task is to analyze the user's input, which may express a specific emotional state, "
-                            "and then generate a concise, clear, detailed, and creative English music prompt that "
-                            "incorporates elements to regulate or transform the stated emotion. For example, if the input "
-                            "indicates sadness, include musical elements that transition from melancholy to hope. If the input "
-                            "indicates anxiety, include calming, soothing elements to ease tension. Keep the output as short and clear as possible, "
-                            "without any extra commentary."
-                        )
-                    },
-                    {"role": "user", "content": emotion_text}
-                ]
+                messages=messages
             )
             
-            prompt = completion.choices[0].message.content.strip()
-            self.logger.info(f"生成提示词: {prompt}")
-            return prompt
+            # 记录完整的 API 响应
+            self.logger.info("API 完整响应:")
+            self.logger.info(f"Model: {completion.model}")
+            self.logger.info(f"Created: {completion.created}")
+            self.logger.info(f"Usage: {completion.usage}")
+            self.logger.info(f"Choices: {len(completion.choices)}")
+            
+            for i, choice in enumerate(completion.choices):
+                self.logger.info(f"Choice {i}:")
+                self.logger.info(f"  Index: {choice.index}")
+                self.logger.info(f"  Message Role: {choice.message.role}")
+                self.logger.info(f"  Message Content: {choice.message.content}")
+                self.logger.info(f"  Finish Reason: {choice.finish_reason}")
+            
+            # 记录原始响应内容，包括所有可能的格式
+            response = completion.choices[0].message.content.strip()
+            self.logger.info("原始响应内容:")
+            self.logger.info("=" * 50)
+            self.logger.info(response)
+            self.logger.info("=" * 50)
+            
+            # 尝试不同的响应格式
+            self.logger.info("尝试解析响应...")
+            
+            # 1. 尝试直接解析为 JSON
+            try:
+                result = json.loads(response)
+                self.logger.info("成功直接解析为 JSON")
+            except json.JSONDecodeError:
+                self.logger.info("直接解析 JSON 失败，尝试其他方法")
+                
+                # 2. 尝试查找 JSON 对象
+                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                if json_match:
+                    response = json_match.group(0)
+                    self.logger.info("成功提取 JSON 对象")
+                    try:
+                        result = json.loads(response)
+                        self.logger.info("成功解析提取的 JSON 对象")
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"解析提取的 JSON 对象失败: {str(e)}")
+                        return None
+                else:
+                    self.logger.warning("未找到 JSON 对象")
+                    return None
+            
+            # 记录解析后的结果
+            self.logger.info("解析结果:")
+            self.logger.info(f"  Raw Result: {result}")
+            
+            # Validate required fields
+            if 'emotion_label' not in result or 'music_prompt' not in result:
+                self.logger.error("Missing required fields in JSON response")
+                self.logger.error(f"Available fields: {list(result.keys())}")
+                return None
+            
+            # Validate emotion label
+            valid_emotions = {'anxiety', 'depression', 'insomnia', 'stress', 'distraction', 'pain', 'trauma'}
+            if result['emotion_label'] not in valid_emotions:
+                self.logger.error(f"Invalid emotion label: {result['emotion_label']}")
+                self.logger.error(f"Valid emotions: {valid_emotions}")
+                return None
+            
+            # Validate music prompt
+            if not isinstance(result['music_prompt'], str):
+                self.logger.error("Music prompt must be a string")
+                self.logger.error(f"Actual type: {type(result['music_prompt'])}")
+                return None
+            
+            prompt_length = len(result['music_prompt'])
+            if prompt_length > 150:
+                self.logger.warning(f"Music prompt is too long ({prompt_length} chars), truncating to 150 chars")
+                result['music_prompt'] = result['music_prompt'][:150]
+            
+            self.logger.info("最终结果:")
+            self.logger.info(f"  Emotion Label: {result['emotion_label']}")
+            self.logger.info(f"  Music Prompt: {result['music_prompt']}")
+            self.logger.info(f"  Prompt Length: {len(result['music_prompt'])} chars")
+            return result['music_prompt']
             
         except Exception as e:
-            self.logger.error(f"提示词生成失败: {str(e)}")
+            self.logger.error(f"Prompt generation failed: {str(e)}")
+            self.logger.error(f"Exception type: {type(e)}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:
