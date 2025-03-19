@@ -5,6 +5,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import warnings
 import logging
+from datetime import datetime
+import soundfile as sf
 
 # 忽略警告
 warnings.filterwarnings('ignore')
@@ -94,6 +96,9 @@ def generate_music_audio():
     try:
         global generation_progress
         prompt = request.json.get('prompt')
+        eq_params = request.json.get('eq_params', None)  # 获取均衡器参数
+        target_db = request.json.get('target_db', -20.0)  # 获取目标响度值
+        limiter_threshold = request.json.get('limiter_threshold', -1.0)  # 获取限幅阈值
         
         if not prompt:
             generation_progress['music_status'] = 0  # 重置进度
@@ -102,7 +107,12 @@ def generate_music_audio():
         # 重置音乐生成进度
         generation_progress['music_status'] = 0
         print("开始生成音乐")
-        success, audio_path = service.generate_music(prompt)
+        success, audio_path, raw_audio_path = service.generate_music(
+            prompt, 
+            eq_params=eq_params,
+            target_db=target_db,
+            limiter_threshold=limiter_threshold
+        )
         
         if not success:
             generation_progress['music_status'] = 0  # 重置进度
@@ -112,17 +122,64 @@ def generate_music_audio():
         print(f"音乐生成结果: success={success}, path={audio_path}")
             
         audio_filename = os.path.basename(audio_path)
+        raw_audio_filename = os.path.basename(raw_audio_path)
         relative_path = f'generated_music/{audio_filename}'
+        raw_relative_path = f'generated_music/{raw_audio_filename}'
         
         return jsonify({
             'success': True,
             'audio_path': relative_path,
+            'raw_audio_path': raw_relative_path,
             'stage': 'music'  # 添加阶段标识
         })
         
     except Exception as e:
         generation_progress['music_status'] = 0  # 重置进度
         print(f"发生错误: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/process_audio', methods=['POST'])
+def process_audio():
+    try:
+        # 获取原始音频路径和处理参数
+        raw_audio_path = request.json.get('raw_audio_path')
+        eq_params = request.json.get('eq_params')
+        target_db = request.json.get('target_db', -20.0)
+        limiter_threshold = request.json.get('limiter_threshold', -1.0)
+        
+        if not raw_audio_path:
+            return jsonify({'success': False, 'error': '未找到原始音频'})
+            
+        # 构建完整的文件路径
+        full_raw_path = os.path.join(app.static_folder, raw_audio_path)
+        
+        # 读取原始音频
+        audio_data, sample_rate = sf.read(full_raw_path)
+        
+        # 处理音频
+        processed_audio = service.audio_processor.process_audio(
+            audio_data,
+            normalize=True,
+            target_db=target_db,
+            eq_params=eq_params
+        )
+        processed_audio = service.audio_processor.apply_limiter(processed_audio, limiter_threshold)
+        
+        # 生成新的处理后音频文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        processed_filename = f"processed_music_{timestamp}.wav"
+        processed_path = os.path.join(app.static_folder, 'generated_music', processed_filename)
+        
+        # 保存处理后的音频
+        sf.write(processed_path, processed_audio, sample_rate)
+        
+        return jsonify({
+            'success': True,
+            'audio_path': f'generated_music/{processed_filename}'
+        })
+        
+    except Exception as e:
+        print(f"音频处理错误: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
