@@ -14,6 +14,7 @@ import logging
 import subprocess
 from datetime import datetime
 import warnings
+from .audio_processor import AudioProcessor
 
 # 忽略特定的警告
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -56,6 +57,7 @@ class MusicGenService:
         self.progress_callback = progress_callback
         self.model = None
         self.mbd = None
+        self.audio_processor = AudioProcessor(sample_rate=self.config.sample_rate)
         self._setup_logging()
         
     def _setup_logging(self):
@@ -149,29 +151,33 @@ class MusicGenService:
             self.logger.error(f"提示词生成失败: {str(e)}")
             return None
     
-    def generate_music(self, prompt: str) -> Tuple[bool, Optional[str]]:
+    def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         生成音乐
         
         Args:
             prompt: 音乐生成提示词
+            eq_params: 均衡器参数字典，包含 low_shelf_gain, mid_gain, high_shelf_gain
+            target_db: 目标响度值（dB）
+            limiter_threshold: 限幅阈值（dB）
             
         Returns:
-            Tuple[bool, Optional[str]]: (是否成功, 生成的音频文件路径)
+            Tuple[bool, Optional[str], Optional[str]]: (是否成功, 生成的音频文件路径, 原始音频文件路径)
         """
         if not self.model:
             self.logger.error("模型未初始化")
-            return False, None
+            return False, None, None
             
         try:
             # 生成唯一的文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = os.path.join(self.output_dir, f"generated_music_{timestamp}.wav")
+            raw_output_file = os.path.join(self.output_dir, f"raw_music_{timestamp}.wav")
             
             # 使用原始的 MusicGen 模型生成音乐
             output = self.model.generate(
                 descriptions=[prompt],
-                progress=True,  # 禁用进度显示
+                progress=True,
                 return_tokens=True
             )
             
@@ -184,13 +190,28 @@ class MusicGenService:
             if audio_data.ndim == 2 and audio_data.shape[0] < audio_data.shape[1]:
                 audio_data = audio_data.T
             
-            # 振幅归一化
-            audio_data = audio_data / np.max(np.abs(audio_data))
+            # 保存原始音频
+            sf.write(
+                str(raw_output_file),
+                audio_data,
+                samplerate=self.config.sample_rate
+            )
             
-            # 保存音频文件
+            # 应用音频处理
+            processed_audio = self.audio_processor.process_audio(
+                audio_data,
+                normalize=True,
+                target_db=target_db,
+                eq_params=eq_params
+            )
+            
+            # 应用限幅器
+            processed_audio = self.audio_processor.apply_limiter(processed_audio, limiter_threshold)
+            
+            # 保存处理后的音频文件
             sf.write(
                 str(output_file),
-                audio_data,
+                processed_audio,
                 samplerate=self.config.sample_rate
             )
             
@@ -199,19 +220,34 @@ class MusicGenService:
             # 处理扩散解码器输出
             if self.config.use_diffusion and self.mbd:
                 diffusion_path = os.path.join(self.output_dir, f"generated_music_diffusion_{timestamp}.wav")
+                raw_diffusion_path = os.path.join(self.output_dir, f"raw_music_diffusion_{timestamp}.wav")
                 out_diffusion = self.mbd.tokens_to_wav(output[1])
+                # 保存原始扩散解码器输出
+                out_diffusion_np = out_diffusion.cpu().numpy()
+                sf.write(
+                    str(raw_diffusion_path),
+                    out_diffusion_np,
+                    samplerate=self.config.sample_rate
+                )
+                # 对扩散解码器输出也应用相同的音频处理
+                out_diffusion = self.audio_processor.process_audio(
+                    out_diffusion_np,
+                    normalize=True,
+                    target_db=-14.0,
+                    eq_params=eq_params
+                )
                 sf.write(
                     str(diffusion_path),
-                    out_diffusion.cpu().numpy(),
+                    out_diffusion,
                     samplerate=self.config.sample_rate
                 )
                 self.logger.info(f"扩散解码器输出保存至: {diffusion_path}")
             
-            return True, output_file
+            return True, output_file, raw_output_file
 
         except Exception as e:
             self.logger.error(f"音乐生成失败: {str(e)}")
-            return False, None
+            return False, None, None
             
     def process_emotion(self, emotion_text: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
@@ -229,7 +265,7 @@ class MusicGenService:
             return False, None, None
             
         # 生成音乐
-        success, audio_path = self.generate_music(prompt)
+        success, audio_path, raw_audio_path = self.generate_music(prompt)
         return success, prompt, audio_path
 
 def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-small', duration: int = 10, use_sampling: bool = True, top_k: int = 250, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
