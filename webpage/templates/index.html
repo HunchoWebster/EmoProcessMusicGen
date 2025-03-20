@@ -243,47 +243,71 @@
         }
 
         function generateMusic() {
-            const emotionText = document.getElementById('emotionText').value;
-            if (!emotionText) {
-                showStatus('请输入情绪描述', false);
-                return;
-            }
+            try {
+                const emotionText = document.getElementById('emotionText').value.trim();
+                if (!emotionText) {
+                    showStatus('请输入情绪描述', false);
+                    return;
+                }
 
-            // 禁用输入和按钮
-            document.getElementById('emotionText').disabled = true;
-            document.getElementById('generateButton').disabled = true;
-            document.getElementById('duration').disabled = true;  // 禁用时长滑动条
-            
-            // 显示加载状态和进度条
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('status').style.display = 'none';
-            document.getElementById('promptContainer').style.display = 'none';
-            document.getElementById('audioContainer').style.display = 'none';
-            
-            // 重置进度条
-            updateProgress(0);
+                // 禁用输入和按钮
+                const elementsToDisable = ['emotionText', 'generateButton', 'duration'];
+                elementsToDisable.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.disabled = true;
+                });
+                
+                // 显示加载状态和进度条
+                const elementsToShow = ['loading', 'progressContainer'];
+                const elementsToHide = ['status', 'promptContainer', 'audioContainer'];
+                
+                elementsToShow.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.style.display = 'block';
+                });
+                
+                elementsToHide.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.style.display = 'none';
+                });
+                
+                // 重置进度条
+                updateProgress(0);
 
-            // 第一步：生成提示词
-            fetch('/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    emotion_text: emotionText
+                // 获取音乐时长
+                const duration = parseInt(document.getElementById('duration').value);
+                if (isNaN(duration) || duration < 5 || duration > 30) {
+                    throw new Error('无效的音乐时长');
+                }
+
+                // 第一步：生成提示词
+                fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        emotion_text: emotionText
+                    })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.stage === 'prompt') {
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success || data.stage !== 'prompt') {
+                        throw new Error(data.error || '生成失败');
+                    }
+
                     // 显示提示词
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('promptContainer').style.display = 'block';
                     document.getElementById('promptText').textContent = data.prompt;
                     
                     // 第二步：生成音乐
-                    fetch('/generate_music', {
+                    return fetch('/generate_music', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -291,69 +315,84 @@
                         body: JSON.stringify({
                             prompt: data.prompt,
                             emotion_label: data.emotion_label,
-                            duration: parseInt(document.getElementById('duration').value)
+                            duration: duration
                         })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success && data.stage === 'music') {
-                            updateProgress(100);
-                            showStatus('音乐生成成功！', true);
-                            
-                            document.getElementById('audioContainer').style.display = 'block';
-                            const rawAudioPlayer = document.getElementById('rawAudioPlayer');
-                            const processedAudioPlayer = document.getElementById('processedAudioPlayer');
-                            const audioToggle = document.getElementById('audioToggle');
-                            
-                            rawAudioPlayer.src = '/static/' + data.raw_audio_path;
-                            processedAudioPlayer.src = '/static/' + data.audio_path;
-                            
-                            rawAudioPlayer.load();
-                            processedAudioPlayer.load();
-                            
-                            // 添加切换事件监听
-                            audioToggle.addEventListener('change', function() {
-                                if (this.checked) {
-                                    processedAudioPlayer.play();
-                                    rawAudioPlayer.pause();
-                                } else {
-                                    rawAudioPlayer.play();
-                                    processedAudioPlayer.pause();
-                                }
-                            });
-                        } else {
-                            throw new Error(data.error || '音乐生成失败');
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('loading').style.display = 'none';
-                        showStatus('发生错误：' + error, false);
                     });
-                } else {
-                    throw new Error(data.error || '生成失败');
-                }
-            })
-            .catch(error => {
-                document.getElementById('loading').style.display = 'none';
-                showStatus('发生错误：' + error, false);
-            })
-            .finally(() => {
-                // 恢复输入和按钮
-                document.getElementById('emotionText').disabled = false;
-                document.getElementById('generateButton').disabled = false;
-                document.getElementById('duration').disabled = false;
-            });
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success || data.stage !== 'music') {
+                        throw new Error(data.error || '音乐生成失败');
+                    }
 
-            // 模拟进度更新
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 1;
-                if (progress <= 90) {
-                    updateProgress(progress);
-                } else {
-                    clearInterval(progressInterval);
-                }
-            }, 500);
+                    updateProgress(100);
+                    showStatus('音乐生成成功！', true);
+                    
+                    // 设置音频播放器
+                    const audioContainer = document.getElementById('audioContainer');
+                    const rawAudioPlayer = document.getElementById('rawAudioPlayer');
+                    const processedAudioPlayer = document.getElementById('processedAudioPlayer');
+                    const audioToggle = document.getElementById('audioToggle');
+                    
+                    if (audioContainer && rawAudioPlayer && processedAudioPlayer && audioToggle) {
+                        audioContainer.style.display = 'block';
+                        rawAudioPlayer.src = '/static/' + data.raw_audio_path;
+                        processedAudioPlayer.src = '/static/' + data.audio_path;
+                        
+                        rawAudioPlayer.load();
+                        processedAudioPlayer.load();
+                        
+                        // 添加切换事件监听
+                        audioToggle.addEventListener('change', function() {
+                            if (this.checked) {
+                                processedAudioPlayer.play().catch(error => {
+                                    console.warn('播放失败:', error);
+                                });
+                                rawAudioPlayer.pause();
+                            } else {
+                                rawAudioPlayer.play().catch(error => {
+                                    console.warn('播放失败:', error);
+                                });
+                                processedAudioPlayer.pause();
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    showStatus('发生错误：' + error.message, false);
+                })
+                .finally(() => {
+                    // 恢复输入和按钮
+                    elementsToDisable.forEach(id => {
+                        const element = document.getElementById(id);
+                        if (element) element.disabled = false;
+                    });
+                });
+
+                // 模拟进度更新
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 1;
+                    if (progress <= 90) {
+                        updateProgress(progress);
+                    } else {
+                        clearInterval(progressInterval);
+                    }
+                }, 500);
+            } catch (error) {
+                showStatus('发生错误：' + error.message, false);
+                // 确保所有元素恢复可用状态
+                ['emotionText', 'generateButton', 'duration'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.disabled = false;
+                });
+            }
         }
 
         // 添加回车键支持
@@ -410,56 +449,84 @@
 
         // 添加音频处理应用函数
         function applyAudioProcessing() {
-            const eq_params = {
-                low_shelf_gain: parseFloat(document.getElementById('lowShelfGain').value),
-                mid_gain: parseFloat(document.getElementById('midGain').value),
-                high_shelf_gain: parseFloat(document.getElementById('highShelfGain').value),
-                low_freq: parseFloat(document.getElementById('lowFreq').value),
-                mid_low_freq: parseFloat(document.getElementById('midLowFreq').value),
-                mid_high_freq: parseFloat(document.getElementById('midHighFreq').value),
-                high_freq: parseFloat(document.getElementById('highFreq').value)
-            };
-            
-            const target_db = parseFloat(document.getElementById('targetDb').value);
-            const limiter_threshold = parseFloat(document.getElementById('limiterThreshold').value);
-            
-            // 获取当前原始音频路径
-            const rawAudioPath = document.getElementById('rawAudioPlayer').src
-                .split('/static/')[1]; // 获取相对路径部分
-            
-            // 调用新的处理接口
-            fetch('/process_audio', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    raw_audio_path: rawAudioPath,
-                    eq_params: eq_params,
-                    target_db: target_db,
-                    limiter_threshold: limiter_threshold
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const processedAudioPlayer = document.getElementById('processedAudioPlayer');
-                    processedAudioPlayer.src = '/static/' + data.audio_path;
-                    processedAudioPlayer.load();
-                    if (document.getElementById('audioToggle').checked) {
-                        processedAudioPlayer.play();
-                    }
-                    showStatus('音频处理已更新！', true);
-                } else {
-                    throw new Error(data.error || '音频处理更新失败');
+            try {
+                const eq_params = {
+                    low_shelf_gain: parseFloat(document.getElementById('lowShelfGain').value),
+                    mid_gain: parseFloat(document.getElementById('midGain').value),
+                    high_shelf_gain: parseFloat(document.getElementById('highShelfGain').value),
+                    low_freq: parseFloat(document.getElementById('lowFreq').value),
+                    mid_low_freq: parseFloat(document.getElementById('midLowFreq').value),
+                    mid_high_freq: parseFloat(document.getElementById('midHighFreq').value),
+                    high_freq: parseFloat(document.getElementById('highFreq').value)
+                };
+                
+                const target_db = parseFloat(document.getElementById('targetDb').value);
+                const limiter_threshold = parseFloat(document.getElementById('limiterThreshold').value);
+                
+                // 参数验证
+                if (isNaN(target_db) || isNaN(limiter_threshold)) {
+                    throw new Error('音频参数无效');
                 }
-            })
-            .catch(error => {
-                showStatus('发生错误：' + error, false);
-            });
+                
+                // 获取当前原始音频路径
+                const rawAudioPlayer = document.getElementById('rawAudioPlayer');
+                if (!rawAudioPlayer.src) {
+                    throw new Error('未找到原始音频');
+                }
+                
+                const rawAudioPath = rawAudioPlayer.src.split('/static/')[1];
+                if (!rawAudioPath) {
+                    throw new Error('音频路径无效');
+                }
+                
+                // 显示加载状态
+                showStatus('正在处理音频...', true);
+                
+                // 调用处理接口
+                fetch('/process_audio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        raw_audio_path: rawAudioPath,
+                        eq_params: eq_params,
+                        target_db: target_db,
+                        limiter_threshold: limiter_threshold
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const processedAudioPlayer = document.getElementById('processedAudioPlayer');
+                        processedAudioPlayer.src = '/static/' + data.audio_path;
+                        processedAudioPlayer.load();
+                        
+                        // 如果启用了音频处理，自动播放处理后的音频
+                        if (document.getElementById('audioToggle').checked) {
+                            processedAudioPlayer.play().catch(error => {
+                                console.warn('自动播放失败:', error);
+                            });
+                        }
+                        showStatus('音频处理已更新！', true);
+                    } else {
+                        throw new Error(data.error || '音频处理更新失败');
+                    }
+                })
+                .catch(error => {
+                    showStatus('发生错误：' + error.message, false);
+                });
+            } catch (error) {
+                showStatus('发生错误：' + error.message, false);
+            }
         }
 
-        // 更新预设参数配置
+        // 优化预设参数配置
         const presets = {
             anxiety: {
                 target_db: -20,
@@ -540,35 +607,44 @@
             }
         };
 
-        // 更新预设应用函数
+        // 优化预设应用函数
         function applyPreset(presetName) {
-            const preset = presets[presetName];
-            if (!preset) return;
+            try {
+                const preset = presets[presetName];
+                if (!preset) {
+                    throw new Error('未找到预设参数');
+                }
 
-            // 更新所有参数值
-            document.getElementById('targetDb').value = preset.target_db;
-            document.getElementById('limiterThreshold').value = preset.limiter_threshold;
-            document.getElementById('lowShelfGain').value = preset.low_shelf_gain;
-            document.getElementById('midGain').value = preset.mid_gain;
-            document.getElementById('highShelfGain').value = preset.high_shelf_gain;
-            document.getElementById('lowFreq').value = preset.low_freq;
-            document.getElementById('midLowFreq').value = preset.mid_low_freq;
-            document.getElementById('midHighFreq').value = preset.mid_high_freq;
-            document.getElementById('highFreq').value = preset.high_freq;
+                // 更新所有参数值
+                const parameters = [
+                    { id: 'targetDb', value: preset.target_db },
+                    { id: 'limiterThreshold', value: preset.limiter_threshold },
+                    { id: 'lowShelfGain', value: preset.low_shelf_gain },
+                    { id: 'midGain', value: preset.mid_gain },
+                    { id: 'highShelfGain', value: preset.high_shelf_gain },
+                    { id: 'lowFreq', value: preset.low_freq },
+                    { id: 'midLowFreq', value: preset.mid_low_freq },
+                    { id: 'midHighFreq', value: preset.mid_high_freq },
+                    { id: 'highFreq', value: preset.high_freq }
+                ];
 
-            // 更新所有显示值
-            updateParameterValue('targetDb', 'targetDbValue');
-            updateParameterValue('limiterThreshold', 'limiterThresholdValue');
-            updateParameterValue('lowShelfGain', 'lowShelfGainValue');
-            updateParameterValue('midGain', 'midGainValue');
-            updateParameterValue('highShelfGain', 'highShelfGainValue');
-            updateFrequencyValue('lowFreq', 'lowFreqValue');
-            updateFrequencyValue('midLowFreq', 'midLowFreqValue');
-            updateFrequencyValue('midHighFreq', 'midHighFreqValue');
-            updateFrequencyValue('highFreq', 'highFreqValue');
+                // 批量更新参数
+                parameters.forEach(param => {
+                    const element = document.getElementById(param.id);
+                    if (element) {
+                        element.value = param.value;
+                        const valueElement = document.getElementById(param.id + 'Value');
+                        if (valueElement) {
+                            valueElement.textContent = param.value + (param.id.includes('Freq') ? ' Hz' : ' dB');
+                        }
+                    }
+                });
 
-            // 应用处理
-            applyAudioProcessing();
+                // 应用处理
+                applyAudioProcessing();
+            } catch (error) {
+                showStatus('应用预设失败：' + error.message, false);
+            }
         }
     </script>
 </body>
