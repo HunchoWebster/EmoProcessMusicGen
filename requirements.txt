@@ -6,18 +6,18 @@ hydra-core>=1.1
 hydra_colorlog
 julius
 num2words
-numpy<2.0.0
+numpy>=1.21.0
 sentencepiece
 spacy==3.7.6
-torch==2.1.0
-torchaudio>=2.0.0,<2.1.2
+torch>=2.0.0
+torchaudio>=2.0.0
 huggingface_hub
 tqdm
-transformers>=4.31.0  # need Encodec there.
+transformers>=4.30.0
 xformers<0.0.23
 demucs
-librosa
-soundfile
+librosa>=0.10.0
+soundfile>=0.12.1
 gradio
 torchmetrics
 encodec
@@ -26,3 +26,7 @@ torchvision==0.16.0
 torchtext==0.16.0
 pesq
 pystoi
+scipy>=1.7.0
+audiocraft @ git+https://github.com/facebookresearch/audiocraft.git
+openai>=1.0.0
+flask>=2.0.0

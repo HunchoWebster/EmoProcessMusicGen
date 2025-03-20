@@ -17,6 +17,18 @@ import subprocess
 from datetime import datetime
 import warnings
 from .audio_processor import AudioProcessor
+import sys
+
+# 添加项目根目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 导入MERT补丁
+try:
+    from mert_patch import patch_mert_config
+    # 应用补丁
+    patch_mert_config()
+except Exception as e:
+    print(f"MERT补丁加载失败，可能会影响模型初始化: {str(e)}")
 
 # 忽略特定的警告
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -27,18 +39,165 @@ os.environ['XFORMERS_MORE_DETAILS'] = '0'
 @dataclass
 class MusicGenConfig:
     """音乐生成配置类"""
-    model_name: str
+    model_name: str = 'facebook/musicgen-style'  # 改用style模型作为默认模型
     use_diffusion: bool = False
     duration: int = 10
     top_k: int = 250
     use_sampling: bool = True
+    temperature: float = 1.0  # 添加温度参数
+    cfg_coef: float = 3.0  # 添加CFG系数
     sample_rate: int = 32000
     output_dir: str = './generated_music'
+    # 风格控制参数
+    style_params: dict = None
 
     def __post_init__(self):
         """确保duration参数被正确设置"""
         if not hasattr(self, 'duration') or self.duration is None:
             self.duration = 10
+        if self.style_params is None:
+            self.style_params = {
+                'eval_q': 3,
+                'excerpt_length': 3.0,
+                'ds_factor': None
+            }
+
+# 添加情绪配置映射
+EMOTION_PRESET_PARAMS = {
+    "anxiety": {
+        "model_params": {
+            "temperature": 0.9,
+            "top_k": 250,
+            "cfg_coef": 3.5
+        },
+        "style_params": {
+            "eval_q": 2,
+            "excerpt_length": 4.0,
+            "ds_factor": 4
+        },
+        "audio_params": {
+            "low_shelf_gain": -2.0,
+            "mid_gain": 0.0,
+            "high_shelf_gain": -3.0,
+            "target_db": -18.0,
+            "limiter_threshold": -1.5
+        }
+    },
+    "depression": {
+        "model_params": {
+            "temperature": 0.85,
+            "top_k": 200,
+            "cfg_coef": 4.0
+        },
+        "style_params": {
+            "eval_q": 2,
+            "excerpt_length": 5.0,
+            "ds_factor": 6
+        },
+        "audio_params": {
+            "low_shelf_gain": 1.0,
+            "mid_gain": -1.0,
+            "high_shelf_gain": -2.0,
+            "target_db": -16.0,
+            "limiter_threshold": -2.0
+        }
+    },
+    "insomnia": {
+        "model_params": {
+            "temperature": 0.7,
+            "top_k": 150,
+            "cfg_coef": 3.0
+        },
+        "style_params": {
+            "eval_q": 3,
+            "excerpt_length": 3.0,
+            "ds_factor": 4
+        },
+        "audio_params": {
+            "low_shelf_gain": 2.0,
+            "mid_gain": -2.0,
+            "high_shelf_gain": -4.0,
+            "target_db": -20.0,
+            "limiter_threshold": -1.0
+        }
+    },
+    "stress": {
+        "model_params": {
+            "temperature": 0.95,
+            "top_k": 220,
+            "cfg_coef": 3.8
+        },
+        "style_params": {
+            "eval_q": 2,
+            "excerpt_length": 4.0,
+            "ds_factor": 5
+        },
+        "audio_params": {
+            "low_shelf_gain": 0.0,
+            "mid_gain": -1.0,
+            "high_shelf_gain": -2.0,
+            "target_db": -18.0,
+            "limiter_threshold": -1.5
+        }
+    },
+    "distraction": {
+        "model_params": {
+            "temperature": 0.8,
+            "top_k": 180,
+            "cfg_coef": 4.2
+        },
+        "style_params": {
+            "eval_q": 3,
+            "excerpt_length": 2.5,
+            "ds_factor": 3
+        },
+        "audio_params": {
+            "low_shelf_gain": -1.0,
+            "mid_gain": 1.5,
+            "high_shelf_gain": -1.0,
+            "target_db": -16.0,
+            "limiter_threshold": -2.0
+        }
+    },
+    "pain": {
+        "model_params": {
+            "temperature": 0.75,
+            "top_k": 200,
+            "cfg_coef": 3.5
+        },
+        "style_params": {
+            "eval_q": 2,
+            "excerpt_length": 4.5,
+            "ds_factor": 5
+        },
+        "audio_params": {
+            "low_shelf_gain": 1.5,
+            "mid_gain": -1.0,
+            "high_shelf_gain": -3.0,
+            "target_db": -17.0,
+            "limiter_threshold": -1.8
+        }
+    },
+    "trauma": {
+        "model_params": {
+            "temperature": 0.7,
+            "top_k": 160,
+            "cfg_coef": 4.5
+        },
+        "style_params": {
+            "eval_q": 1,
+            "excerpt_length": 5.0,
+            "ds_factor": 6
+        },
+        "audio_params": {
+            "low_shelf_gain": 0.5,
+            "mid_gain": -0.5,
+            "high_shelf_gain": -4.0,
+            "target_db": -19.0,
+            "limiter_threshold": -1.2
+        }
+    }
+}
 
 class MusicGenService:
     """音乐生成服务类"""
@@ -61,6 +220,7 @@ class MusicGenService:
         self.mbd = None
         self.audio_processor = AudioProcessor(sample_rate=self.config.sample_rate)
         self._setup_logging()
+        self.current_emotion_label = None
         
     def _setup_logging(self):
         """设置日志"""
@@ -85,16 +245,65 @@ class MusicGenService:
         """
         try:
             self.logger.info("正在初始化模型...")
-            self.model = MusicGen.get_pretrained(self.config.model_name)
             
+            # 尝试不同的模型，如果指定的模型加载失败
+            models_to_try = [self.config.model_name]
+            
+            # 如果请求的是style模型，添加备用模型
+            if 'musicgen-style' in self.config.model_name:
+                models_to_try.extend(['facebook/musicgen-small', 'facebook/musicgen-medium'])
+            
+            # 尝试加载每个模型，直到成功
+            exception = None
+            for model_name in models_to_try:
+                try:
+                    self.logger.info(f"尝试加载模型: {model_name}")
+                    
+                    # 在加载模型之前为MERTConfig应用补丁
+                    if 'musicgen-style' in model_name:
+                        try:
+                            from mert_patch import patch_mert_config
+                            patch_mert_config()
+                        except Exception as patch_err:
+                            self.logger.warning(f"MERT补丁应用失败: {str(patch_err)}")
+                    
+                    # 加载模型
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                    self.model = MusicGen.get_pretrained(model_name, device=device)
+                    self.logger.info(f"成功加载模型: {model_name}")
+                    break
+                except Exception as e:
+                    self.logger.warning(f"无法加载模型 {model_name}: {str(e)}")
+                    exception = e
+            
+            # 如果所有模型都加载失败
+            if self.model is None:
+                if exception:
+                    raise exception
+                else:
+                    raise RuntimeError("所有模型加载尝试均失败")
+            
+            # 如果成功加载了不同的模型，更新配置
+            if self.model.name != self.config.model_name:
+                self.logger.info(f"使用替代模型: {self.model.name} 而不是请求的 {self.config.model_name}")
+                self.config.model_name = self.model.name
+            
+            # 加载扩散模型（如果需要）
             if self.config.use_diffusion:
                 self.mbd = MultiBandDiffusion.get_mbd_musicgen()
             
+            # 设置生成参数
             self.model.set_generation_params(
                 use_sampling=self.config.use_sampling,
                 top_k=self.config.top_k,
-                duration=self.config.duration
+                temperature=self.config.temperature,
+                duration=self.config.duration,
+                cfg_coef=self.config.cfg_coef
             )
+            
+            # 如果是style模型，设置风格条件器参数
+            if 'musicgen-style' in self.config.model_name:
+                self._configure_style_conditioner()
             
             # 确保输出目录存在
             Path(self.output_dir).mkdir(exist_ok=True)
@@ -104,9 +313,74 @@ class MusicGenService:
             
         except Exception as e:
             self.logger.error(f"模型初始化失败: {str(e)}")
+            self.logger.error(f"错误类型: {type(e)}")
+            import traceback
+            self.logger.error(f"错误堆栈: {traceback.format_exc()}")
+            return False
+            
+    def _configure_style_conditioner(self):
+        """配置风格条件器参数"""
+        try:
+            # 判断模型是否有风格条件器
+            if hasattr(self.model.lm, 'condition_provider') and \
+               hasattr(self.model.lm.condition_provider, 'conditioners') and \
+               'self_wav' in self.model.lm.condition_provider.conditioners:
+                
+                params = self.config.style_params
+                self.model.set_style_conditioner_params(
+                    eval_q=params['eval_q'],
+                    excerpt_length=params['excerpt_length'],
+                    ds_factor=params['ds_factor']
+                )
+                self.logger.info(f"风格条件器参数已设置: {params}")
+        except Exception as e:
+            self.logger.error(f"设置风格条件器参数失败: {str(e)}")
+    
+    def apply_emotion_preset(self, emotion_label: str) -> bool:
+        """
+        根据情绪标签应用预设参数
+        
+        Args:
+            emotion_label: 情绪标签
+            
+        Returns:
+            bool: 是否成功应用预设
+        """
+        if emotion_label not in EMOTION_PRESET_PARAMS:
+            self.logger.error(f"未找到情绪标签的预设参数: {emotion_label}")
+            return False
+            
+        try:
+            preset = EMOTION_PRESET_PARAMS[emotion_label]
+            
+            # 更新模型参数（不再设置duration）
+            model_params = preset['model_params']
+            self.model.set_generation_params(
+                use_sampling=self.config.use_sampling,
+                top_k=model_params.get('top_k', self.config.top_k),
+                temperature=model_params.get('temperature', self.config.temperature),
+                duration=self.config.duration,  # 使用配置中的duration
+                cfg_coef=model_params.get('cfg_coef', self.config.cfg_coef)
+            )
+            
+            # 更新风格条件器参数
+            if 'musicgen-style' in self.config.model_name:
+                style_params = preset['style_params']
+                self.model.set_style_conditioner_params(
+                    eval_q=style_params.get('eval_q', 3),
+                    excerpt_length=style_params.get('excerpt_length', 3.0),
+                    ds_factor=style_params.get('ds_factor', None)
+                )
+                
+            self.current_emotion_label = emotion_label
+            self.logger.info(f"已应用情绪标签 '{emotion_label}' 的预设参数")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"应用情绪预设失败: {str(e)}")
             return False
     
-    def create_prompt(self, emotion_text: str) -> Optional[str]:
+    def create_prompt(self, emotion_text: str) -> Optional[dict]:
         """
         Generate music prompt based on emotional description
         
@@ -114,7 +388,7 @@ class MusicGenService:
             emotion_text: Emotional description text
             
         Returns:
-            Optional[str]: Generated prompt, returns None if failed
+            Optional[dict]: Generated prompt and emotion label
         """
         if not self.api_key:
             self.logger.error("API key not set")
@@ -148,7 +422,7 @@ class MusicGenService:
                         "- Include specific musical elements (rhythm, timbre, melodic features, etc.)\n"
                         "- Target emotional regulation goals\n"
                         "- Be concise and clear\n"
-                        "- Not exceed 150 characters\n\n"
+                        "- Must not exceed 130 characters\n\n"
                         "Example valid response:\n"
                         "{\n"
                         '  "emotion_label": "anxiety",\n'
@@ -246,7 +520,11 @@ class MusicGenService:
             self.logger.info(f"  Emotion Label: {result['emotion_label']}")
             self.logger.info(f"  Music Prompt: {result['music_prompt']}")
             self.logger.info(f"  Prompt Length: {len(result['music_prompt'])} chars")
-            return result['music_prompt']
+            
+            # 应用情绪预设参数
+            self.apply_emotion_preset(result['emotion_label'])
+            
+            return result
             
         except Exception as e:
             self.logger.error(f"Prompt generation failed: {str(e)}")
@@ -254,6 +532,153 @@ class MusicGenService:
             import traceback
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return None
+    
+    def get_audio_params_for_emotion(self, emotion_label: str = None) -> dict:
+        """
+        获取指定情绪标签的音频处理参数
+        
+        Args:
+            emotion_label: 情绪标签，如果为None则使用当前情绪标签
+            
+        Returns:
+            dict: 音频处理参数
+        """
+        label = emotion_label or self.current_emotion_label
+        if not label or label not in EMOTION_PRESET_PARAMS:
+            return {
+                "low_shelf_gain": 0.0,
+                "mid_gain": 0.0,
+                "high_shelf_gain": 0.0,
+                "target_db": -20.0,
+                "limiter_threshold": -1.0
+            }
+        
+        return EMOTION_PRESET_PARAMS[label]['audio_params']
+    
+    def generate_transition_music(self, from_emotion: str, to_emotion: str, 
+                                  from_prompt: str, to_prompt: str, 
+                                  transition_duration: int = 10) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        生成情绪过渡音乐
+        
+        Args:
+            from_emotion: 起始情绪标签
+            to_emotion: 目标情绪标签
+            from_prompt: 起始情绪提示词
+            to_prompt: 目标情绪提示词
+            transition_duration: 过渡音乐时长（秒）
+            
+        Returns:
+            Tuple[bool, Optional[str], Optional[str]]: (是否成功, 生成的音频文件路径, 原始音频文件路径)
+        """
+        if not self.model:
+            self.logger.error("模型未初始化")
+            return False, None, None
+            
+        try:
+            # 生成唯一的文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = os.path.join(self.output_dir, f"transition_music_{timestamp}.wav")
+            raw_output_file = os.path.join(self.output_dir, f"raw_transition_{timestamp}.wav")
+            
+            # 生成起始情绪音乐
+            self.apply_emotion_preset(from_emotion)
+            from_params = EMOTION_PRESET_PARAMS[from_emotion]['model_params']
+            self.model.set_generation_params(
+                use_sampling=self.config.use_sampling,
+                top_k=from_params.get('top_k', self.config.top_k),
+                temperature=from_params.get('temperature', self.config.temperature),
+                duration=transition_duration // 2,  # 一半时间用于起始情绪
+                cfg_coef=from_params.get('cfg_coef', self.config.cfg_coef)
+            )
+            
+            from_output = self.model.generate(
+                descriptions=[from_prompt],
+                progress=True
+            )
+            
+            # 生成目标情绪音乐
+            self.apply_emotion_preset(to_emotion)
+            to_params = EMOTION_PRESET_PARAMS[to_emotion]['model_params']
+            self.model.set_generation_params(
+                use_sampling=self.config.use_sampling,
+                top_k=to_params.get('top_k', self.config.top_k),
+                temperature=to_params.get('temperature', self.config.temperature),
+                duration=transition_duration // 2,  # 一半时间用于目标情绪
+                cfg_coef=to_params.get('cfg_coef', self.config.cfg_coef)
+            )
+            
+            to_output = self.model.generate(
+                descriptions=[to_prompt],
+                progress=True
+            )
+            
+            # 处理音频数据
+            from_audio = from_output[0].cpu().numpy()
+            to_audio = to_output[0].cpu().numpy()
+            
+            if from_audio.ndim == 3:
+                from_audio = from_audio.squeeze(0)
+            if to_audio.ndim == 3:
+                to_audio = to_audio.squeeze(0)
+                
+            if from_audio.ndim == 2 and from_audio.shape[0] < from_audio.shape[1]:
+                from_audio = from_audio.T
+            if to_audio.ndim == 2 and to_audio.shape[0] < to_audio.shape[1]:
+                to_audio = to_audio.T
+                
+            # 创建过渡音频 - 使用音频处理器创建平滑过渡
+            transition_audio = self.audio_processor.create_transition(
+                from_audio, 
+                to_audio,
+                overlap_seconds=2.0  # 两秒重叠进行过渡
+            )
+            
+            # 保存原始音频
+            sf.write(
+                str(raw_output_file),
+                transition_audio,
+                samplerate=self.config.sample_rate
+            )
+            
+            # 应用音频处理 - 使用起始和目标情绪参数的中间值
+            from_audio_params = self.get_audio_params_for_emotion(from_emotion)
+            to_audio_params = self.get_audio_params_for_emotion(to_emotion)
+            
+            # 计算中间参数
+            transition_params = {
+                "low_shelf_gain": (from_audio_params["low_shelf_gain"] + to_audio_params["low_shelf_gain"]) / 2,
+                "mid_gain": (from_audio_params["mid_gain"] + to_audio_params["mid_gain"]) / 2,
+                "high_shelf_gain": (from_audio_params["high_shelf_gain"] + to_audio_params["high_shelf_gain"]) / 2
+            }
+            
+            target_db = (from_audio_params["target_db"] + to_audio_params["target_db"]) / 2
+            limiter_threshold = (from_audio_params["limiter_threshold"] + to_audio_params["limiter_threshold"]) / 2
+            
+            # 应用处理
+            processed_audio = self.audio_processor.process_audio(
+                transition_audio,
+                normalize=True,
+                target_db=target_db,
+                eq_params=transition_params
+            )
+            
+            # 应用限幅器
+            processed_audio = self.audio_processor.apply_limiter(processed_audio, limiter_threshold)
+            
+            # 保存处理后的音频文件
+            sf.write(
+                str(output_file),
+                processed_audio,
+                samplerate=self.config.sample_rate
+            )
+            
+            self.logger.info(f"过渡音乐生成成功，保存至: {output_file}")
+            return True, output_file, raw_output_file
+            
+        except Exception as e:
+            self.logger.error(f"过渡音乐生成失败: {str(e)}")
+            return False, None, None
     
     def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:
         """
@@ -277,6 +702,13 @@ class MusicGenService:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = os.path.join(self.output_dir, f"generated_music_{timestamp}.wav")
             raw_output_file = os.path.join(self.output_dir, f"raw_music_{timestamp}.wav")
+            
+            # 如果未提供EQ参数但有情绪标签，则使用情绪预设的参数
+            if eq_params is None and self.current_emotion_label:
+                eq_params = self.get_audio_params_for_emotion()
+                target_db = eq_params.get('target_db', target_db)
+                limiter_threshold = eq_params.get('limiter_threshold', limiter_threshold)
+                self.logger.info(f"使用情绪 '{self.current_emotion_label}' 的音频处理参数")
             
             # 使用原始的 MusicGen 模型生成音乐
             output = self.model.generate(
@@ -353,7 +785,7 @@ class MusicGenService:
             self.logger.error(f"音乐生成失败: {str(e)}")
             return False, None, None
             
-    def process_emotion(self, emotion_text: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def process_emotion(self, emotion_text: str) -> Tuple[bool, Optional[dict], Optional[str]]:
         """
         处理情绪输入并生成音乐的完整流程
         
@@ -361,18 +793,18 @@ class MusicGenService:
             emotion_text: 情绪描述文本
             
         Returns:
-            Tuple[bool, Optional[str], Optional[str]]: (是否成功, 生成的提示词, 音频文件路径)
+            Tuple[bool, Optional[dict], Optional[str]]: (是否成功, 生成的结果(prompt和emotion_label), 音频文件路径)
         """
-        # 生成提示词
-        prompt = self.create_prompt(emotion_text)
-        if not prompt:
+        # 生成提示词和情绪标签
+        result = self.create_prompt(emotion_text)
+        if not result:
             return False, None, None
             
         # 生成音乐
-        success, audio_path, raw_audio_path = self.generate_music(prompt)
-        return success, prompt, audio_path
+        success, audio_path, raw_audio_path = self.generate_music(result['music_prompt'])
+        return success, result, audio_path
 
-def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-small', duration: int = 10, use_sampling: bool = True, top_k: int = 250, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
+def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-style', duration: int = 10, use_sampling: bool = True, top_k: int = 250, temperature: float = 1.0, cfg_coef: float = 3.0, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
     """
     创建并初始化音乐生成服务的便捷函数
     
@@ -382,6 +814,8 @@ def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/mu
         duration: 生成音乐的时长（秒）
         use_sampling: 是否使用采样
         top_k: top-k采样参数
+        temperature: 温度参数
+        cfg_coef: CFG系数
         output_dir: 输出目录
         progress_callback: 进度回调函数
         
@@ -393,6 +827,8 @@ def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/mu
         duration=duration,
         use_sampling=use_sampling,
         top_k=top_k,
+        temperature=temperature,
+        cfg_coef=cfg_coef,
         output_dir=output_dir
     )
     service = MusicGenService(api_key, config, output_dir, progress_callback)

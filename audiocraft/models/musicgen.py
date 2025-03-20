@@ -54,7 +54,7 @@ class MusicGen(BaseGenModel):
         self.set_generation_params(duration=15)  # default duration
 
     @staticmethod
-    def get_pretrained(name: str = 'facebook/musicgen-melody', device=None):
+    def get_pretrained(name: str = 'facebook/musicgen-style', device=None):
         """Return pretrained model, we provide four models:
         - facebook/musicgen-small (300M), text to music,
           # see: https://huggingface.co/facebook/musicgen-small
