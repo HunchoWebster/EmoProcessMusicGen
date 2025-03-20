@@ -39,7 +39,7 @@ os.environ['XFORMERS_MORE_DETAILS'] = '0'
 @dataclass
 class MusicGenConfig:
     """音乐生成配置类"""
-    model_name: str = 'facebook/musicgen-style'  # 改用style模型作为默认模型
+    model_name: str = 'facebook/musicgen-small'  # 使用small模型作为默认模型
     use_diffusion: bool = False
     duration: int = 10
     top_k: int = 250
@@ -250,7 +250,7 @@ class MusicGenService:
             models_to_try = [self.config.model_name]
             
             # 如果请求的是style模型，添加备用模型
-            if 'musicgen-style' in self.config.model_name:
+            if 'musicgen-small' in self.config.model_name:
                 models_to_try.extend(['facebook/musicgen-small', 'facebook/musicgen-medium'])
             
             # 尝试加载每个模型，直到成功
@@ -260,7 +260,7 @@ class MusicGenService:
                     self.logger.info(f"尝试加载模型: {model_name}")
                     
                     # 在加载模型之前为MERTConfig应用补丁
-                    if 'musicgen-style' in model_name:
+                    if 'musicgen-small' in model_name:
                         try:
                             from mert_patch import patch_mert_config
                             patch_mert_config()
@@ -302,7 +302,7 @@ class MusicGenService:
             )
             
             # 如果是style模型，设置风格条件器参数
-            if 'musicgen-style' in self.config.model_name:
+            if 'musicgen-small' in self.config.model_name:
                 self._configure_style_conditioner()
             
             # 确保输出目录存在
@@ -364,7 +364,7 @@ class MusicGenService:
             )
             
             # 更新风格条件器参数
-            if 'musicgen-style' in self.config.model_name:
+            if 'musicgen-small' in self.config.model_name:
                 style_params = preset['style_params']
                 self.model.set_style_conditioner_params(
                     eval_q=style_params.get('eval_q', 3),
@@ -804,7 +804,7 @@ class MusicGenService:
         success, audio_path, raw_audio_path = self.generate_music(result['music_prompt'])
         return success, result, audio_path
 
-def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-style', duration: int = 10, use_sampling: bool = True, top_k: int = 250, temperature: float = 1.0, cfg_coef: float = 3.0, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
+def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-small', duration: int = 10, use_sampling: bool = True, top_k: int = 250, temperature: float = 1.0, cfg_coef: float = 3.0, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
     """
     创建并初始化音乐生成服务的便捷函数
     

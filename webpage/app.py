@@ -67,7 +67,7 @@ def create_service_with_retry(max_retries=3):
             # 首先尝试style模型
             service = create_service(
                 api_key=os.getenv("ARK_API_KEY"),
-                model_name='facebook/musicgen-style',  # 使用style模型
+                model_name='facebook/musicgen-small',  # 使用small模型
                 duration=10,  # 确保时长为10秒
                 use_sampling=True,
                 top_k=250,
