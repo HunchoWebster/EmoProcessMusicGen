@@ -60,3 +60,5 @@ dataset/*
 /notebooks
 /local_scripts
 /notes
+/webpage/static/generated_music
+
