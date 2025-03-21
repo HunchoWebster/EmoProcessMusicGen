@@ -75,154 +75,149 @@
             from, to { border-color: transparent }
             50% { border-color: orange; }
         }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            color: #007bff;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 class="text-center mb-4">情绪调节音乐生成器</h1>
         
-        <div class="mb-3">
-            <label for="emotionText" class="form-label">请描述您当前的情绪状态：</label>
-            <textarea class="form-control" id="emotionText" rows="3" 
-                      placeholder="例如：今天工作压力很大，需要放松"></textarea>
-        </div>
+        <!-- 添加导航栏 -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="generate-tab" data-bs-toggle="tab" data-bs-target="#generate" type="button" role="tab" aria-controls="generate" aria-selected="true">生成音乐</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="transition-tab" data-bs-toggle="tab" data-bs-target="#transition" type="button" role="tab" aria-controls="transition" aria-selected="false">情绪转换</button>
+            </li>
+        </ul>
         
-        <div class="mb-3">
-            <label for="duration" class="form-label">音乐时长 (秒)</label>
-            <input type="range" class="form-range" id="duration" min="5" max="30" value="10">
-            <div class="text-center" id="durationValue">10 秒</div>
-        </div>
-        
-        <button class="btn btn-primary w-100" id="generateButton" onclick="generateMusic()">生成音乐</button>
-        
-        <div id="loading" class="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
-            </div>
-            <p>正在处理您的请求...</p>
-        </div>
-        
-        <div id="promptDisplay" class="typing-animation"></div>
-        
-        <div class="progress" id="progressContainer">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                 role="progressbar" 
-                 id="progressBar"
-                 style="width: 0%">
-                0%
-            </div>
-        </div>
-        
-        <div id="status" class="status" style="display: none;"></div>
-        
-        <div id="promptContainer" class="prompt" style="display: none;">
-            <strong>生成的提示词：</strong>
-            <p id="promptText"></p>
-        </div>
-        
-        <div id="audioContainer" style="display: none;">
-            <div class="mb-3">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="audioToggle" checked>
-                    <label class="form-check-label" for="audioToggle">使用音频处理</label>
+        <div class="tab-content" id="myTabContent">
+            <!-- 生成音乐标签页 -->
+            <div class="tab-pane fade show active" id="generate" role="tabpanel" aria-labelledby="generate-tab">
+                <div class="mb-3">
+                    <label for="emotionText" class="form-label">请描述您当前的情绪状态：</label>
+                    <textarea class="form-control" id="emotionText" rows="3" 
+                              placeholder="例如：今天工作压力很大，需要放松"></textarea>
                 </div>
-            </div>
-            
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">音频处理参数</h5>
+                
+                <div class="mb-3">
+                    <label for="duration" class="form-label">音乐时长 (秒)</label>
+                    <input type="range" class="form-range" id="duration" min="5" max="30" value="10">
+                    <div class="text-center" id="durationValue">10 秒</div>
                 </div>
-                <div class="card-body">
+                
+                <button class="btn btn-primary w-100" id="generateButton" onclick="generateMusic()">生成音乐</button>
+                
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p>正在处理您的请求...</p>
+                </div>
+                
+                <div id="promptDisplay" class="typing-animation"></div>
+                
+                <div class="progress" id="progressContainer">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         id="progressBar"
+                         style="width: 0%">
+                        0%
+                    </div>
+                </div>
+                
+                <div id="status" class="status" style="display: none;"></div>
+                
+                <div id="promptContainer" class="prompt" style="display: none;">
+                    <strong>生成的提示词：</strong>
+                    <p id="promptText"></p>
+                </div>
+                
+                <div id="audioContainer" style="display: none;">
                     <div class="mb-3">
-                        <h6>基本参数</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <!-- 移除这里的时长滑条 -->
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="audioToggle" checked>
+                            <label class="form-check-label" for="audioToggle">使用音频处理</label>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">音频处理参数</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="lowShelfGain" class="form-label">低频增益 (dB)</label>
+                                        <input type="range" class="form-range" id="lowShelfGain" min="-12" max="12" step="0.5" value="0">
+                                        <div class="text-center" id="lowShelfGainValue">0.0 dB</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="midGain" class="form-label">中频增益 (dB)</label>
+                                        <input type="range" class="form-range" id="midGain" min="-12" max="12" step="0.5" value="0">
+                                        <div class="text-center" id="midGainValue">0.0 dB</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="highShelfGain" class="form-label">高频增益 (dB)</label>
+                                        <input type="range" class="form-range" id="highShelfGain" min="-12" max="12" step="0.5" value="0">
+                                        <div class="text-center" id="highShelfGainValue">0.0 dB</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="targetDB" class="form-label">目标响度 (dB)</label>
+                                        <input type="range" class="form-range" id="targetDB" min="-24" max="-6" step="0.5" value="-20">
+                                        <div class="text-center" id="targetDBValue">-20.0 dB</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="limiterThreshold" class="form-label">限幅阈值 (dB)</label>
+                                        <input type="range" class="form-range" id="limiterThreshold" min="-6" max="0" step="0.5" value="-1">
+                                        <div class="text-center" id="limiterThresholdValue">-1.0 dB</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <button class="btn btn-primary" id="applyAudioProcessing">应用音频处理</button>
                             </div>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <h6>症状预设</h6>
-                        <div class="btn-group w-100" role="group">
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('anxiety')">焦虑</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('depression')">抑郁</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('insomnia')">失眠</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('stress')">压力过大</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('distraction')">注意力分散</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('pain')">慢性疼痛</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="applyPreset('ptsd')">创伤后应激</button>
-                        </div>
-                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6">
-                            <label for="targetDb" class="form-label">目标响度 (dB)</label>
-                            <input type="range" class="form-range" id="targetDb" min="-30" max="-10" value="-20">
-                            <div class="text-center" id="targetDbValue">-20 dB</div>
+                            <h5>原始音频</h5>
+                            <audio id="rawAudioPlayer" controls>
+                                您的浏览器不支持音频播放
+                            </audio>
                         </div>
                         <div class="col-md-6">
-                            <label for="limiterThreshold" class="form-label">限幅阈值 (dB)</label>
-                            <input type="range" class="form-range" id="limiterThreshold" min="-3" max="0" value="-1">
-                            <div class="text-center" id="limiterThresholdValue">-1 dB</div>
+                            <h5>处理后音频</h5>
+                            <audio id="processedAudioPlayer" controls>
+                                您的浏览器不支持音频播放
+                            </audio>
                         </div>
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-md-4">
-                            <label for="lowShelfGain" class="form-label">低频增益 (dB)</label>
-                            <input type="range" class="form-range" id="lowShelfGain" min="-12" max="12" value="0">
-                            <div class="text-center" id="lowShelfGainValue">0 dB</div>
-                            <label for="lowFreq" class="form-label">低频截止频率 (Hz)</label>
-                            <input type="range" class="form-range" id="lowFreq" min="20" max="500" value="100">
-                            <div class="text-center" id="lowFreqValue">100 Hz</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="midGain" class="form-label">中频增益 (dB)</label>
-                            <input type="range" class="form-range" id="midGain" min="-12" max="12" value="0">
-                            <div class="text-center" id="midGainValue">0 dB</div>
-                            <div class="row">
-                                <div class="col-6">
-                                    <label for="midLowFreq" class="form-label">中频下限 (Hz)</label>
-                                    <input type="range" class="form-range" id="midLowFreq" min="200" max="2000" value="1000">
-                                    <div class="text-center" id="midLowFreqValue">1000 Hz</div>
-                                </div>
-                                <div class="col-6">
-                                    <label for="midHighFreq" class="form-label">中频上限 (Hz)</label>
-                                    <input type="range" class="form-range" id="midHighFreq" min="2000" max="8000" value="5000">
-                                    <div class="text-center" id="midHighFreqValue">5000 Hz</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="highShelfGain" class="form-label">高频增益 (dB)</label>
-                            <input type="range" class="form-range" id="highShelfGain" min="-12" max="12" value="0">
-                            <div class="text-center" id="highShelfGainValue">0 dB</div>
-                            <label for="highFreq" class="form-label">高频截止频率 (Hz)</label>
-                            <input type="range" class="form-range" id="highFreq" min="2000" max="16000" value="8000">
-                            <div class="text-center" id="highFreqValue">8000 Hz</div>
-                        </div>
-                    </div>
-                    <div class="text-center mt-3">
-                        <button class="btn btn-primary" onclick="applyAudioProcessing()">应用处理</button>
                     </div>
                 </div>
             </div>
             
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>原始音频</h5>
-                    <audio id="rawAudioPlayer" controls>
-                        您的浏览器不支持音频播放
-                    </audio>
-                </div>
-                <div class="col-md-6">
-                    <h5>处理后音频</h5>
-                    <audio id="processedAudioPlayer" controls>
-                        您的浏览器不支持音频播放
-                    </audio>
-                </div>
+            <!-- 情绪转换标签页 -->
+            <div class="tab-pane fade" id="transition" role="tabpanel" aria-labelledby="transition-tab">
+                <iframe src="/transition" style="width: 100%; height: 800px; border: none;"></iframe>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // 添加时长滑动条的事件监听
         document.getElementById('duration').addEventListener('input', function() {
@@ -410,8 +405,8 @@
         }
 
         // 添加音频处理参数监听器
-        document.getElementById('targetDb').addEventListener('input', function() {
-            updateParameterValue('targetDb', 'targetDbValue');
+        document.getElementById('targetDB').addEventListener('input', function() {
+            updateParameterValue('targetDB', 'targetDBValue');
         });
         document.getElementById('limiterThreshold').addEventListener('input', function() {
             updateParameterValue('limiterThreshold', 'limiterThresholdValue');
@@ -460,7 +455,7 @@
                     high_freq: parseFloat(document.getElementById('highFreq').value)
                 };
                 
-                const target_db = parseFloat(document.getElementById('targetDb').value);
+                const target_db = parseFloat(document.getElementById('targetDB').value);
                 const limiter_threshold = parseFloat(document.getElementById('limiterThreshold').value);
                 
                 // 参数验证
@@ -617,7 +612,7 @@
 
                 // 更新所有参数值
                 const parameters = [
-                    { id: 'targetDb', value: preset.target_db },
+                    { id: 'targetDB', value: preset.target_db },
                     { id: 'limiterThreshold', value: preset.limiter_threshold },
                     { id: 'lowShelfGain', value: preset.low_shelf_gain },
                     { id: 'midGain', value: preset.mid_gain },

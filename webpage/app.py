@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 # 设置日志级别
 logging.getLogger().setLevel(logging.ERROR)
 
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response, url_for
 from webpage.musicgen_service import create_service, MusicGenConfig, EMOTION_PRESET_PARAMS, MusicGenService
 from pathlib import Path
 import json
@@ -145,6 +145,16 @@ def before_request():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """测试端点，用于验证服务是否正常响应"""
+    print("测试端点被访问")
+    return jsonify({
+        'success': True,
+        'message': '服务正常响应',
+        'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
 @app.route('/progress', methods=['GET'])
 def get_progress():
@@ -288,70 +298,203 @@ def generate_music_audio():
 
 @app.route('/generate_transition', methods=['POST'])
 def generate_transition():
-    """生成情绪过渡音乐"""
+    """
+    生成情绪过渡音乐
+    """
+    import time
+    import traceback
+    from datetime import datetime
+    
+    overall_start_time = time.time()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    app.logger.info(f"[{timestamp}] ===== 接收到情绪过渡音乐生成请求 =====")
+    app.logger.info(f"[{timestamp}] 请求数据: {request.json}")
+    
     try:
-        global generation_progress
+        # 获取参数
+        data = request.json
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.info(f"[{timestamp}] 接收到请求参数: {data}")
         
-        # 获取请求参数
-        from_emotion = request.json.get('from_emotion')
-        to_emotion = request.json.get('to_emotion')
-        from_prompt = request.json.get('from_prompt')
-        to_prompt = request.json.get('to_prompt')
-        transition_duration = request.json.get('duration', 30)
+        # 检查参数是否存在
+        required_fields = ['from_emotion', 'to_emotion', 'from_prompt', 'to_prompt']
+        missing_fields = [field for field in required_fields if field not in data]
         
-        # 验证参数
-        if not all([from_emotion, to_emotion, from_prompt, to_prompt]):
-            return jsonify({'success': False, 'error': '缺少必要参数'})
-        
-        if from_emotion not in EMOTION_PRESET_PARAMS or to_emotion not in EMOTION_PRESET_PARAMS:
-            return jsonify({'success': False, 'error': '无效的情绪标签'})
-        
-        # 检查服务是否可用
-        if service is None:
-            return jsonify({'success': False, 'error': '音乐生成服务不可用，请联系管理员'})
+        if missing_fields:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 缺少必要参数: {missing_fields}")
+            return jsonify({
+                "error": f"缺少必要参数: {missing_fields}",
+                "status": "error"
+            }), 400
             
-        # 重置进度
-        generation_progress = {
-            'prompt_status': 100,  # 已有提示词，直接设置为100%
-            'music_status': 0
-        }
+        # 获取情绪和提示词
+        from_emotion = data.get('from_emotion', '').strip().lower()
+        to_emotion = data.get('to_emotion', '').strip().lower()
+        from_prompt = data.get('from_prompt', '').strip()
+        to_prompt = data.get('to_prompt', '').strip()
+        transition_duration = int(data.get('transition_duration', 30))
         
-        print(f"开始生成情绪过渡音乐: {from_emotion} -> {to_emotion}")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.info(f"[{timestamp}] 处理后参数: from_emotion={from_emotion}, to_emotion={to_emotion}, transition_duration={transition_duration}")
+        app.logger.info(f"[{timestamp}] 起始提示词: {from_prompt}")
+        app.logger.info(f"[{timestamp}] 目标提示词: {to_prompt}")
         
+        # 验证情绪标签
+        valid_emotions = set(EMOTION_PRESET_PARAMS.keys())
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.info(f"[{timestamp}] 有效情绪标签: {valid_emotions}")
+        
+        if from_emotion not in valid_emotions:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 无效的起始情绪标签: {from_emotion}")
+            return jsonify({
+                "error": f"无效的起始情绪标签: {from_emotion}，有效标签: {list(valid_emotions)}",
+                "status": "error"
+            }), 400
+            
+        if to_emotion not in valid_emotions:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 无效的目标情绪标签: {to_emotion}")
+            return jsonify({
+                "error": f"无效的目标情绪标签: {to_emotion}，有效标签: {list(valid_emotions)}",
+                "status": "error"
+            }), 400
+            
+        # 检查提示词
+        if not from_prompt:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 起始提示词为空")
+            return jsonify({
+                "error": "起始提示词不能为空",
+                "status": "error"
+            }), 400
+            
+        if not to_prompt:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 目标提示词为空")
+            return jsonify({
+                "error": "目标提示词不能为空",
+                "status": "error"
+            }), 400
+            
+        # 检查时长
+        if transition_duration < 10:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.warning(f"[{timestamp}] 过渡时长过短，调整为最小值: 10秒")
+            transition_duration = 10
+        elif transition_duration > 60:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.warning(f"[{timestamp}] 过渡时长过长，调整为最大值: 60秒")
+            transition_duration = 60
+            
+        # 检查音乐服务是否已初始化
+        if not service:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 音乐服务未初始化")
+            return jsonify({
+                "error": "音乐服务未初始化，请稍后再试",
+                "status": "error"
+            }), 500
+            
+        # 检查模型是否已加载
+        if not service.model:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.warning(f"[{timestamp}] 模型未加载，尝试加载模型")
+            try:
+                load_start = time.time()
+                service.load_model()
+                load_end = time.time()
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                app.logger.info(f"[{timestamp}] 模型加载成功，耗时: {load_end - load_start:.2f}秒")
+            except Exception as e:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                app.logger.error(f"[{timestamp}] 模型加载失败: {str(e)}")
+                app.logger.error(f"[{timestamp}] 错误堆栈: {traceback.format_exc()}")
+                return jsonify({
+                    "error": f"模型加载失败: {str(e)}",
+                    "status": "error"
+                }), 500
+                
         # 生成过渡音乐
-        success, audio_path, raw_audio_path = service.generate_transition_music(
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.info(f"[{timestamp}] 开始生成过渡音乐...")
+        generate_start = time.time()
+        success, processed_audio_path, raw_audio_path = service.generate_transition_music(
             from_emotion=from_emotion,
             to_emotion=to_emotion,
             from_prompt=from_prompt,
             to_prompt=to_prompt,
             transition_duration=transition_duration
         )
+        generate_end = time.time()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         
-        if not success:
-            generation_progress['music_status'] = 0  # 重置进度
-            return jsonify({'success': False, 'error': '过渡音乐生成失败'})
+        if success:
+            app.logger.info(f"[{timestamp}] 过渡音乐生成成功，耗时: {generate_end - generate_start:.2f}秒")
+            app.logger.info(f"[{timestamp}] 音频文件路径: processed={processed_audio_path}, raw={raw_audio_path}")
             
-        generation_progress['music_status'] = 100  # 只在成功时设置100%
+            # 转换为相对路径
+            if processed_audio_path:
+                processed_audio_file = os.path.basename(processed_audio_path)
+                processed_audio_url = url_for('static', filename=f'generated_music/{processed_audio_file}')
+            else:
+                processed_audio_url = None
+                
+            if raw_audio_path:
+                raw_audio_file = os.path.basename(raw_audio_path)
+                raw_audio_url = url_for('static', filename=f'generated_music/{raw_audio_file}')
+            else:
+                raw_audio_url = None
+                
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.info(f"[{timestamp}] 音频URL: processed={processed_audio_url}, raw={raw_audio_url}")
+            
+            response = {
+                "status": "success",
+                "message": "过渡音乐生成成功",
+                "processed_audio": processed_audio_url,
+                "raw_audio": raw_audio_url,
+                "from_emotion": from_emotion,
+                "to_emotion": to_emotion,
+                "transition_duration": transition_duration
+            }
+            
+            overall_end_time = time.time()
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.info(f"[{timestamp}] 请求处理成功，总耗时: {overall_end_time - overall_start_time:.2f}秒")
+            app.logger.info(f"[{timestamp}] ===== 情绪过渡音乐生成请求处理完成 =====")
+            return jsonify(response)
+        else:
+            app.logger.error(f"[{timestamp}] 过渡音乐生成失败，耗时: {generate_end - generate_start:.2f}秒")
+            
+            response = {
+                "status": "error",
+                "message": "过渡音乐生成失败，请稍后再试",
+                "error": "音乐生成服务出错"
+            }
+            
+            overall_end_time = time.time()
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            app.logger.error(f"[{timestamp}] 请求处理失败，总耗时: {overall_end_time - overall_start_time:.2f}秒")
+            app.logger.error(f"[{timestamp}] ===== 情绪过渡音乐生成请求处理失败 =====")
+            return jsonify(response), 500
+            
+    except Exception as e:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.error(f"[{timestamp}] 处理过渡音乐请求时发生错误: {str(e)}")
+        app.logger.error(f"[{timestamp}] 错误堆栈: {traceback.format_exc()}")
         
-        # 获取相对路径
-        audio_filename = os.path.basename(audio_path)
-        raw_audio_filename = os.path.basename(raw_audio_path)
-        relative_path = f'generated_music/{audio_filename}'
-        raw_relative_path = f'generated_music/{raw_audio_filename}'
+        overall_end_time = time.time()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        app.logger.error(f"[{timestamp}] 请求处理异常，总耗时: {overall_end_time - overall_start_time:.2f}秒")
+        app.logger.error(f"[{timestamp}] ===== 情绪过渡音乐生成请求处理异常 =====")
         
         return jsonify({
-            'success': True,
-            'audio_path': relative_path,
-            'raw_audio_path': raw_relative_path,
-            'from_emotion': from_emotion,
-            'to_emotion': to_emotion,
-            'stage': 'transition'
-        })
-        
-    except Exception as e:
-        generation_progress['music_status'] = 0  # 重置进度
-        print(f"过渡音乐生成错误: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+            "status": "error",
+            "message": f"服务器内部错误: {str(e)}",
+            "error": str(e)
+        }), 500
 
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
@@ -404,14 +547,29 @@ def process_audio():
         # 保存处理后的音频
         sf.write(processed_path, processed_audio, sample_rate)
         
+        # 生成音频文件路径
+        processed_audio_file = f'generated_music/{processed_filename}'
+        raw_audio_file = f'generated_music/{raw_audio_file}'
+        
+        # 使用 url_for 生成正确的 URL
+        processed_audio_url = url_for('static', filename=processed_audio_file)
+        raw_audio_url = url_for('static', filename=raw_audio_file)
+        
         return jsonify({
             'success': True,
-            'audio_path': f'generated_music/{processed_filename}'
+            'audio_path': processed_audio_url,
+            'raw_audio_path': raw_audio_url,
+            'emotion_label': emotion_label,
+            'stage': 'processed'  # 添加阶段标识
         })
         
     except Exception as e:
         print(f"音频处理错误: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/transition')
+def transition():
+    return render_template('transition.html')
 
 if __name__ == '__main__':
     # 确保静态文件目录存在
