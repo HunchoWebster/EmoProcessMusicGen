@@ -546,4 +546,34 @@ class AudioProcessor:
             
         except Exception as e:
             self.logger.error(f"均衡器处理失败: {str(e)}")
-            return audio_data  # 发生错误时返回原始音频 
+            return audio_data  # 发生错误时返回原始音频
+            
+    def apply_low_shelf(self, audio_data, gain):
+        """应用低频均衡器"""
+        try:
+            if len(audio_data) <= 15:
+                return audio_data
+            return self.low_shelf_filter(audio_data, gain)
+        except Exception as e:
+            self.logger.error(f"低频均衡器处理失败: {str(e)}")
+            return audio_data
+            
+    def apply_mid(self, audio_data, gain):
+        """应用中频均衡器"""
+        try:
+            if len(audio_data) <= 15:
+                return audio_data
+            return self.mid_filter(audio_data, gain)
+        except Exception as e:
+            self.logger.error(f"中频均衡器处理失败: {str(e)}")
+            return audio_data
+            
+    def apply_high_shelf(self, audio_data, gain):
+        """应用高频均衡器"""
+        try:
+            if len(audio_data) <= 15:
+                return audio_data
+            return self.high_shelf_filter(audio_data, gain)
+        except Exception as e:
+            self.logger.error(f"高频均衡器处理失败: {str(e)}")
+            return audio_data 
