@@ -4,8 +4,6 @@ from scipy import signal
 from typing import Tuple, Optional
 import logging
 import librosa
-import time
-from datetime import datetime
 
 class AudioProcessor:
     """音频处理类，提供音量归一化、均衡器和限幅器功能"""
@@ -187,26 +185,22 @@ class AudioProcessor:
             self.logger.error(f"音频处理失败: {str(e)}")
             return audio
             
-    def create_transition(self, from_audio: np.ndarray, to_audio: np.ndarray, overlap_seconds: float = 2.0) -> np.ndarray:
+    def create_transition(self, from_audio, to_audio, overlap_seconds=2.0):
         """
         创建两段音频之间的平滑过渡
         
         Args:
-            from_audio: 起始音频数组
-            to_audio: 目标音频数组
-            overlap_seconds: 重叠部分的秒数
+            from_audio: 起始音频数据
+            to_audio: 目标音频数据
+            overlap_seconds: 重叠部分的长度（秒）
             
         Returns:
-            过渡后的音频数组
+            numpy.ndarray: 过渡后的音频数据
         """
-<<<<<<< HEAD
         try:
             # 确保音频数据是numpy数组
             from_audio = np.asarray(from_audio)
             to_audio = np.asarray(to_audio)
-            
-            # 打印初始数据形状
-            self.logger.info(f"创建过渡 - 初始形状: from_audio={from_audio.shape}, to_audio={to_audio.shape}")
             
             # 确保音频数据是2D的 [channels, samples]
             if from_audio.ndim == 1:
@@ -230,7 +224,7 @@ class AudioProcessor:
             overlap_samples = min(overlap_samples, from_audio.shape[1] // 2, to_audio.shape[1] // 2)
             if overlap_samples < 1:
                 overlap_samples = 1
-                self.logger.warning("重叠样本数太小，已设置为1")
+                self.logger.warning("重叠长度太短，使用最小值1")
             
             # 创建重叠部分的淡入淡出窗口
             fade_in = np.linspace(0, 1, overlap_samples)
@@ -240,7 +234,7 @@ class AudioProcessor:
             total_length = from_audio.shape[1] + to_audio.shape[1] - overlap_samples
             
             # 创建结果数组
-            result = np.zeros((from_audio.shape[0], total_length))
+            result = np.zeros((from_audio.shape[0], total_length), dtype=np.float32)
             
             # 复制第一段音频（除了重叠部分用淡出处理）
             result[:, :from_audio.shape[1]] = from_audio
@@ -253,276 +247,22 @@ class AudioProcessor:
             for i in range(to_audio.shape[0]):
                 result[i, offset:offset+overlap_samples] *= fade_in
             
-            # 返回前转换为适合sf.write的格式
-            # 对于sf.write，数据应是 [samples, channels] 的形状
-            # 如果是单声道，可以是1D数组
-            if result.shape[0] == 1:  # 如果是单声道
-                result = result.squeeze(0)  # 转为一维数组
-            else:
-                # 如果是多声道，调整为 [samples, channels]
-                result = result.T
+            # 确保输出数据使用float32类型，soundfile库需要此类型
+            result = result.astype(np.float32)
+            
+            # 如果结果是单声道，转换为一维数组
+            if result.shape[0] == 1:
+                result = result.squeeze(0)
                 
-            self.logger.info(f"创建过渡 - 最终形状: result={result.shape}")
             return result
             
         except Exception as e:
             self.logger.error(f"创建音频过渡失败: {str(e)}")
-            self.logger.error(f"from_audio shape: {from_audio.shape if hasattr(from_audio, 'shape') else 'unknown'}")
-            self.logger.error(f"to_audio shape: {to_audio.shape if hasattr(to_audio, 'shape') else 'unknown'}")
-            # 异常情况下，返回一个简单的静音片段
-            silence = np.zeros(self.sample_rate * 5)  # 5秒静音
-            return silence
-=======
-        overall_start_time = time.time()
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        self.logger.info(f"[{timestamp}] ===== 开始创建音频过渡 =====")
-        
-        try:
-            # 记录输入参数
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 起始音频形状: {from_audio.shape}, 类型: {from_audio.dtype}")
-            self.logger.info(f"[{timestamp}] 目标音频形状: {to_audio.shape}, 类型: {to_audio.dtype}")
-            self.logger.info(f"[{timestamp}] 重叠时长: {overlap_seconds} 秒")
+            self.logger.error(f"from_audio shape: {from_audio.shape if hasattr(from_audio, 'shape') else 'unknown'}, dtype: {from_audio.dtype if hasattr(from_audio, 'dtype') else 'unknown'}")
+            self.logger.error(f"to_audio shape: {to_audio.shape if hasattr(to_audio, 'shape') else 'unknown'}, dtype: {to_audio.dtype if hasattr(to_audio, 'dtype') else 'unknown'}")
             
-            # 确保音频具有正确的维度 (通道数, 样本数)
-            if from_audio.ndim == 1:
-                from_audio = from_audio.reshape(1, -1)
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 转换起始音频为2D: {from_audio.shape}")
-            if to_audio.ndim == 1:
-                to_audio = to_audio.reshape(1, -1)
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 转换目标音频为2D: {to_audio.shape}")
-                
-            # 确保两个音频有相同的通道数
-            if from_audio.shape[0] != to_audio.shape[0]:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.warning(f"[{timestamp}] 音频通道数不匹配: {from_audio.shape[0]} vs {to_audio.shape[0]}")
-                
-                # 取最小通道数
-                channels = min(from_audio.shape[0], to_audio.shape[0])
-                from_audio = from_audio[:channels]
-                to_audio = to_audio[:channels]
-                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 已调整为相同通道数: {channels}，新形状 - 起始: {from_audio.shape}, 目标: {to_audio.shape}")
-                
-            # 计算重叠样本数
-            overlap_samples = int(overlap_seconds * self.sample_rate)
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 重叠样本数: {overlap_samples}")
-            
-            # 确保重叠样本数不超过音频长度
-            from_length = from_audio.shape[1]
-            to_length = to_audio.shape[1]
-            
-            if overlap_samples >= from_length or overlap_samples >= to_length:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.warning(f"[{timestamp}] 重叠样本数过大(原始值:{overlap_samples})，调整为更小的值")
-                overlap_samples = min(from_length // 2, to_length // 2)
-                self.logger.info(f"[{timestamp}] 调整后的重叠样本数: {overlap_samples}")
-                
-            # 创建线性淡入淡出权重
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 创建交叉淡变曲线...")
-            try:
-                # 线性淡变曲线
-                fade_out = np.linspace(1.0, 0.0, overlap_samples)
-                fade_in = np.linspace(0.0, 1.0, overlap_samples)
-                
-                # 检查曲线是否包含无效值
-                if np.isnan(fade_in).any() or np.isnan(fade_out).any():
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    self.logger.warning(f"[{timestamp}] 淡变曲线包含NaN值，将进行修复")
-                    fade_in = np.nan_to_num(fade_in)
-                    fade_out = np.nan_to_num(fade_out)
-                    
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 淡变曲线长度: {len(fade_in)}")
-            except Exception as curve_error:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.error(f"[{timestamp}] 创建淡变曲线失败: {str(curve_error)}")
-                # 使用备选方案
-                fade_out = np.ones(overlap_samples) * 0.5
-                fade_in = np.ones(overlap_samples) * 0.5
-                self.logger.info(f"[{timestamp}] 使用均匀0.5权重代替淡变曲线")
-                
-            # 截取音频片段进行混合
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 准备混合音频片段...")
-            
-            try:
-                # 获取起始音频的末尾部分
-                from_end = from_audio[:, -overlap_samples:]
-                # 获取目标音频的开始部分
-                to_start = to_audio[:, :overlap_samples]
-                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 起始音频末尾形状: {from_end.shape}, 目标音频开头形状: {to_start.shape}")
-                
-                # 检查音频片段是否包含无效值
-                if np.isnan(from_end).any() or np.isinf(from_end).any():
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    self.logger.warning(f"[{timestamp}] 起始音频末尾包含无效值，将进行修复")
-                    from_end = np.nan_to_num(from_end)
-                    
-                if np.isnan(to_start).any() or np.isinf(to_start).any():
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    self.logger.warning(f"[{timestamp}] 目标音频开头包含无效值，将进行修复")
-                    to_start = np.nan_to_num(to_start)
-                
-                # 混合音频片段
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 开始混合过渡片段...")
-                
-                mixed_overlap = (from_end * fade_out.reshape(1, -1) + 
-                                to_start * fade_in.reshape(1, -1))
-                
-                # 检查混合结果是否包含无效值
-                if np.isnan(mixed_overlap).any() or np.isinf(mixed_overlap).any():
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    self.logger.warning(f"[{timestamp}] 混合片段包含无效值，将进行修复")
-                    mixed_overlap = np.nan_to_num(mixed_overlap)
-                    
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 混合片段形状: {mixed_overlap.shape}")
-            except Exception as mix_error:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.error(f"[{timestamp}] 混合音频片段失败: {str(mix_error)}")
-                import traceback
-                self.logger.error(f"[{timestamp}] 错误堆栈: {traceback.format_exc()}")
-                
-                # 创建一个空白的混合片段
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 使用备选方案: 创建一个静默过渡片段")
-                mixed_overlap = np.zeros((from_audio.shape[0], overlap_samples))
-                
-            # 构建最终的过渡音频
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 构建最终的过渡音频...")
-                
-            try:
-                # 获取不重叠的部分
-                from_start = from_audio[:, :-overlap_samples]
-                to_end = to_audio[:, overlap_samples:]
-                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 起始非重叠部分形状: {from_start.shape}, 目标非重叠部分形状: {to_end.shape}")
-                
-                # 拼接三个部分: 起始非重叠部分 + 混合重叠部分 + 目标非重叠部分
-                result = np.concatenate([from_start, mixed_overlap, to_end], axis=1)
-                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 结果音频形状: {result.shape}")
-                
-            except Exception as concat_error:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.error(f"[{timestamp}] 拼接音频失败: {str(concat_error)}")
-                import traceback
-                self.logger.error(f"[{timestamp}] 错误堆栈: {traceback.format_exc()}")
-                
-                # 简单拼接，不做混合
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 使用备选方案: 简单拼接音频")
-                result = np.concatenate([from_audio, to_audio], axis=1)
-                self.logger.info(f"[{timestamp}] 简单拼接结果形状: {result.shape}")
-            
-            # 检查结果音频质量
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 检查结果音频...")
-            
-            # 检查是否有NaN或Inf
-            if np.isnan(result).any() or np.isinf(result).any():
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.warning(f"[{timestamp}] 结果音频包含NaN或Inf值，将修复")
-                result = np.nan_to_num(result)
-                
-            # 检查是否有爆音
-            max_val = np.max(np.abs(result))
-            if max_val > 1.0:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.warning(f"[{timestamp}] 检测到可能的爆音，最大值: {max_val}，将进行归一化")
-                result = result / max_val * 0.95
-                
-            # 计算信噪比（简单估计）
-            try:
-                signal_power = np.mean(result**2)
-                noise_floor = 1e-10  # 避免除以零
-                snr_db = 10 * np.log10(signal_power / noise_floor) if signal_power > noise_floor else 0
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 估计信噪比: {snr_db:.2f} dB")
-            except Exception as snr_error:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.warning(f"[{timestamp}] 计算信噪比失败: {str(snr_error)}")
-            
-            overall_end_time = time.time()
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.info(f"[{timestamp}] 音频过渡创建成功，总耗时: {overall_end_time - overall_start_time:.2f}秒")
-            self.logger.info(f"[{timestamp}] ===== 音频过渡创建完成 =====")
-            
-            return result
-            
-        except Exception as e:
-            overall_end_time = time.time()
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            self.logger.error(f"[{timestamp}] 创建音频过渡失败: {str(e)}")
-            import traceback
-            self.logger.error(f"[{timestamp}] 错误堆栈: {traceback.format_exc()}")
-            self.logger.error(f"[{timestamp}] 总耗时(失败): {overall_end_time - overall_start_time:.2f}秒")
-            self.logger.error(f"[{timestamp}] ===== 音频过渡创建失败 =====")
-            
-            # 尝试备选方案：简单连接两个音频
-            try:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 尝试备选方案: 简单拼接两个音频")
-                
-                # 确保音频格式一致
-                if from_audio.ndim == 1:
-                    from_audio = from_audio.reshape(1, -1)
-                if to_audio.ndim == 1:
-                    to_audio = to_audio.reshape(1, -1)
-                
-                # 保证通道数匹配
-                if from_audio.shape[0] != to_audio.shape[0]:
-                    channels = min(from_audio.shape[0], to_audio.shape[0])
-                    from_audio = from_audio[:channels]
-                    to_audio = to_audio[:channels]
-                
-                # 修复任何NaN或Inf
-                from_audio = np.nan_to_num(from_audio)
-                to_audio = np.nan_to_num(to_audio)
-                
-                # 简单连接
-                result = np.concatenate([from_audio, to_audio], axis=1)
-                
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.info(f"[{timestamp}] 备选方案成功，结果形状: {result.shape}")
-                return result
-            except Exception as fallback_error:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                self.logger.error(f"[{timestamp}] 备选方案也失败: {str(fallback_error)}")
-                
-                # 最终备选：返回第一个音频
-                try:
-                    if isinstance(from_audio, np.ndarray) and from_audio.size > 0:
-                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                        self.logger.info(f"[{timestamp}] 使用最终备选方案: 仅返回起始音频")
-                        return from_audio
-                    elif isinstance(to_audio, np.ndarray) and to_audio.size > 0:
-                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                        self.logger.info(f"[{timestamp}] 使用最终备选方案: 仅返回目标音频")
-                        return to_audio
-                    else:
-                        # 创建一个空白音频
-                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                        self.logger.warning(f"[{timestamp}] 无法使用任何输入音频，生成空白音频")
-                        return np.zeros((1, int(self.sample_rate * 5)))  # 5秒空白
-                except Exception as final_error:
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    self.logger.error(f"[{timestamp}] 所有备选方案都失败: {str(final_error)}")
-                    # 返回一个最小的可用音频
-                    return np.zeros((1, int(self.sample_rate * 1)))  # 1秒空白
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
+            # 在发生错误时，返回起始音频作为回退方案
+            return from_audio.astype(np.float32)
         
     def create_smooth_transition(self, from_audio, to_audio, overlap_seconds=2.0):
         """
@@ -536,74 +276,38 @@ class AudioProcessor:
         Returns:
             numpy.ndarray: 过渡后的音频数据
         """
-        try:
-            # 确保音频数据是numpy数组
-            from_audio = np.asarray(from_audio)
-            to_audio = np.asarray(to_audio)
+        # 确保音频是2D的
+        if from_audio.ndim == 1:
+            from_audio = from_audio.reshape(1, -1)
+        if to_audio.ndim == 1:
+            to_audio = to_audio.reshape(1, -1)
             
-            # 打印初始数据形状
-            self.logger.info(f"创建平滑过渡 - 初始形状: from_audio={from_audio.shape}, to_audio={to_audio.shape}")
-            
-            # 确保音频数据是2D的
-            if from_audio.ndim == 1:
-                from_audio = from_audio.reshape(1, -1)
-            if to_audio.ndim == 1:
-                to_audio = to_audio.reshape(1, -1)
-                
-            # 确保两段音频的通道数相同
-            if from_audio.shape[0] != to_audio.shape[0]:
-                self.logger.warning(f"音频通道数不匹配: from_audio={from_audio.shape[0]}, to_audio={to_audio.shape[0]}")
-                # 如果通道数不同，将多通道音频转换为单通道
-                if from_audio.shape[0] > 1:
-                    from_audio = from_audio.mean(axis=0, keepdims=True)
-                if to_audio.shape[0] > 1:
-                    to_audio = to_audio.mean(axis=0, keepdims=True)
-            
-            # 计算重叠部分的长度（样本数）
-            overlap_samples = int(overlap_seconds * self.sample_rate)
-            
-            # 确保重叠长度不超过音频长度
-            overlap_samples = min(overlap_samples, from_audio.shape[1] // 2, to_audio.shape[1] // 2)
-            if overlap_samples < 1:
-                overlap_samples = 1
-                self.logger.warning("重叠样本数太小，已设置为1")
-            
-            # 创建重叠部分的淡入淡出窗口 - 使用余弦窗口实现更平滑的过渡
-            fade_in = np.sin(np.linspace(0, np.pi/2, overlap_samples))**2
-            fade_out = np.sin(np.linspace(np.pi/2, 0, overlap_samples))**2
-            
-            # 计算最终音频的长度
-            total_length = from_audio.shape[1] + to_audio.shape[1] - overlap_samples
-            result = np.zeros((from_audio.shape[0], total_length))
-            
-            # 复制第一段音频（除了重叠部分用淡出处理）
-            result[:, :from_audio.shape[1]] = from_audio
-            for i in range(from_audio.shape[0]):
-                result[i, from_audio.shape[1]-overlap_samples:from_audio.shape[1]] *= fade_out
-            
-            # 复制第二段音频（开始部分用淡入处理）
-            offset = from_audio.shape[1] - overlap_samples
-            result[:, offset:offset+to_audio.shape[1]] += to_audio
-            for i in range(to_audio.shape[0]):
-                result[i, offset:offset+overlap_samples] *= fade_in
-            
-            # 返回前转换为适合sf.write的格式
-            if result.shape[0] == 1:  # 如果是单声道
-                result = result.squeeze(0)  # 转为一维数组
-            else:
-                # 如果是多声道，调整为 [samples, channels]
-                result = result.T
-                
-            self.logger.info(f"创建平滑过渡 - 最终形状: result={result.shape}")
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"创建平滑音频过渡失败: {str(e)}")
-            self.logger.error(f"from_audio shape: {from_audio.shape if hasattr(from_audio, 'shape') else 'unknown'}")
-            self.logger.error(f"to_audio shape: {to_audio.shape if hasattr(to_audio, 'shape') else 'unknown'}")
-            # 异常情况下，返回一个简单的静音片段
-            silence = np.zeros(self.sample_rate * 5)  # 5秒静音
-            return silence
+        # 确保两段音频的通道数相同
+        assert from_audio.shape[0] == to_audio.shape[0], "两段音频的通道数必须相同"
+        
+        # 计算重叠部分的长度（样本数）
+        overlap_samples = int(overlap_seconds * self.sample_rate)
+        
+        # 创建重叠部分的淡入淡出窗口 - 使用余弦窗口实现更平滑的过渡
+        fade_in = np.sin(np.linspace(0, np.pi/2, overlap_samples))**2
+        fade_out = np.sin(np.linspace(np.pi/2, 0, overlap_samples))**2
+        
+        # 计算最终音频的长度
+        total_length = from_audio.shape[1] + to_audio.shape[1] - overlap_samples
+        result = np.zeros((from_audio.shape[0], total_length))
+        
+        # 复制第一段音频（除了重叠部分用淡出处理）
+        result[:, :from_audio.shape[1]] = from_audio
+        for i in range(from_audio.shape[0]):
+            result[i, from_audio.shape[1]-overlap_samples:from_audio.shape[1]] *= fade_out
+        
+        # 复制第二段音频（开始部分用淡入处理）
+        offset = from_audio.shape[1] - overlap_samples
+        result[:, offset:offset+to_audio.shape[1]] += to_audio
+        for i in range(to_audio.shape[0]):
+            result[i, offset:offset+overlap_samples] *= fade_in
+        
+        return result
         
     def create_spectral_transition(self, from_audio, to_audio, overlap_seconds=2.0):
         """
@@ -658,54 +362,4 @@ class AudioProcessor:
         if from_audio.ndim > 1 or to_audio.ndim > 1:
             result = result.reshape(1, -1)
             
-        return result
-
-    def apply_equalizer(self, audio_data, params):
-        """应用均衡器"""
-        try:
-            # 确保音频数据长度足够
-            if len(audio_data) <= 15:
-                self.logger.warning("音频数据长度不足，跳过均衡器处理")
-                return audio_data
-                
-            # 应用均衡器
-            low_shelf = self.apply_low_shelf(audio_data, params.get('low_shelf_gain', 0))
-            mid = self.apply_mid(audio_data, params.get('mid_gain', 0))
-            high_shelf = self.apply_high_shelf(audio_data, params.get('high_shelf_gain', 0))
-            
-            # 混合所有频段
-            return low_shelf + mid + high_shelf
-            
-        except Exception as e:
-            self.logger.error(f"均衡器处理失败: {str(e)}")
-            return audio_data  # 发生错误时返回原始音频
-            
-    def apply_low_shelf(self, audio_data, gain):
-        """应用低频均衡器"""
-        try:
-            if len(audio_data) <= 15:
-                return audio_data
-            return self.low_shelf_filter(audio_data, gain)
-        except Exception as e:
-            self.logger.error(f"低频均衡器处理失败: {str(e)}")
-            return audio_data
-            
-    def apply_mid(self, audio_data, gain):
-        """应用中频均衡器"""
-        try:
-            if len(audio_data) <= 15:
-                return audio_data
-            return self.mid_filter(audio_data, gain)
-        except Exception as e:
-            self.logger.error(f"中频均衡器处理失败: {str(e)}")
-            return audio_data
-            
-    def apply_high_shelf(self, audio_data, gain):
-        """应用高频均衡器"""
-        try:
-            if len(audio_data) <= 15:
-                return audio_data
-            return self.high_shelf_filter(audio_data, gain)
-        except Exception as e:
-            self.logger.error(f"高频均衡器处理失败: {str(e)}")
-            return audio_data 
+        return result 

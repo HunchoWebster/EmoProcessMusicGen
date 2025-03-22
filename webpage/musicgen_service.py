@@ -83,25 +83,6 @@ EMOTION_PRESET_PARAMS = {
             "limiter_threshold": -1.5
         }
     },
-    "relaxed": {
-        "model_params": {
-            "temperature": 0.8,
-            "top_k": 200,
-            "cfg_coef": 3.0
-        },
-        "style_params": {
-            "eval_q": 3,
-            "excerpt_length": 3.0,
-            "ds_factor": 3
-        },
-        "audio_params": {
-            "low_shelf_gain": 0.0,
-            "mid_gain": 0.0,
-            "high_shelf_gain": 0.0,
-            "target_db": -20.0,
-            "limiter_threshold": -1.0
-        }
-    },
     "depression": {
         "model_params": {
             "temperature": 0.85,
@@ -240,8 +221,6 @@ class MusicGenService:
         self.audio_processor = AudioProcessor(sample_rate=self.config.sample_rate)
         self._setup_logging()
         self.current_emotion_label = None
-        self.wav = None  # 添加wav属性
-        self.self_wav = None  # 添加self_wav属性
         
     def _setup_logging(self):
         """设置日志"""
@@ -368,38 +347,40 @@ class MusicGenService:
         except Exception as e:
             self.logger.error(f"设置风格条件器参数失败: {str(e)}")
     
-    def apply_emotion_preset(self, emotion):
-        """应用情绪预设"""
-        try:
-            if emotion not in EMOTION_PRESET_PARAMS:
-                self.logger.warning(f"未找到情绪 '{emotion}' 的预设参数，使用默认参数")
-                return True
-                
-            params = EMOTION_PRESET_PARAMS[emotion]
-            self.logger.info(f"应用情绪预设: {emotion}")
+    def apply_emotion_preset(self, emotion_label: str) -> bool:
+        """
+        根据情绪标签应用预设参数
+        
+        Args:
+            emotion_label: 情绪标签
             
-<<<<<<< HEAD
+        Returns:
+            bool: 是否成功应用预设
+        """
+        if emotion_label not in EMOTION_PRESET_PARAMS:
+            self.logger.error(f"未找到情绪标签的预设参数: {emotion_label}")
+            return False
+            
+        try:
+            preset = EMOTION_PRESET_PARAMS[emotion_label]
+            
             # 更新模型参数
             model_params = preset['model_params']
-=======
-            # 设置生成参数
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
             self.model.set_generation_params(
-                temperature=params.get('temperature', 0.95),
-                top_k=params.get('top_k', 220),
-                cfg_coef=params.get('cfg_coef', 3.8)
+                use_sampling=self.config.use_sampling,
+                top_k=model_params.get('top_k', self.config.top_k),
+                temperature=model_params.get('temperature', self.config.temperature),
+                duration=self.config.duration,  # 使用配置中的duration
+                cfg_coef=model_params.get('cfg_coef', self.config.cfg_coef)
             )
             
-<<<<<<< HEAD
             self.current_emotion_label = emotion_label
             self.logger.info(f"已应用情绪标签 '{emotion_label}' 的预设参数")
-=======
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
             return True
             
         except Exception as e:
             self.logger.error(f"应用情绪预设失败: {str(e)}")
-            return False  # 发生错误时返回 False
+            return False
     
     def create_prompt(self, emotion_text: str) -> Optional[dict]:
         """
@@ -577,11 +558,26 @@ class MusicGenService:
         return EMOTION_PRESET_PARAMS[label]['audio_params']
     
     def generate_transition_music(self, from_emotion: str, to_emotion: str, 
-                                from_prompt: str, to_prompt: str, 
-                                transition_duration: int = 30) -> Tuple[bool, str, str]:
-        """生成情绪过渡音乐"""
+                                  from_prompt: str, to_prompt: str, 
+                                  transition_duration: int = 10) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        生成情绪过渡音乐
+        
+        Args:
+            from_emotion: 起始情绪标签
+            to_emotion: 目标情绪标签
+            from_prompt: 起始情绪提示词
+            to_prompt: 目标情绪提示词
+            transition_duration: 过渡音乐时长（秒）
+            
+        Returns:
+            Tuple[bool, Optional[str], Optional[str]]: (是否成功, 生成的音频文件路径, 原始音频文件路径)
+        """
+        if not self.model:
+            self.logger.error("模型未初始化")
+            return False, None, None
+            
         try:
-<<<<<<< HEAD
             # 确保transition_duration是整数
             transition_duration = int(transition_duration)
             
@@ -589,29 +585,39 @@ class MusicGenService:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = os.path.join(self.output_dir, f"transition_music_{timestamp}.wav")
             raw_output_file = os.path.join(self.output_dir, f"raw_transition_{timestamp}.wav")
-=======
-            # 计算每个部分的时长
-            segment_duration = transition_duration // 2
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
             
             # 生成起始情绪音乐
-            success, from_audio_path = self.generate_music(
-                from_prompt,
-                duration=segment_duration,  # 使用计算出的时长
-                eq_params=self.get_audio_params_for_emotion(from_emotion)
+            self.apply_emotion_preset(from_emotion)
+            from_params = EMOTION_PRESET_PARAMS[from_emotion]['model_params']
+            self.model.set_generation_params(
+                use_sampling=self.config.use_sampling,
+                top_k=from_params.get('top_k', self.config.top_k),
+                temperature=from_params.get('temperature', self.config.temperature),
+                duration=transition_duration // 2,  # 一半时间用于起始情绪
+                cfg_coef=from_params.get('cfg_coef', self.config.cfg_coef)
+            )
+            
+            from_output = self.model.generate(
+                descriptions=[from_prompt],
+                progress=True
             )
             
             # 生成目标情绪音乐
-            success, to_audio_path = self.generate_music(
-                to_prompt,
-                duration=segment_duration,  # 使用计算出的时长
-                eq_params=self.get_audio_params_for_emotion(to_emotion)
+            self.apply_emotion_preset(to_emotion)
+            to_params = EMOTION_PRESET_PARAMS[to_emotion]['model_params']
+            self.model.set_generation_params(
+                use_sampling=self.config.use_sampling,
+                top_k=to_params.get('top_k', self.config.top_k),
+                temperature=to_params.get('temperature', self.config.temperature),
+                duration=transition_duration // 2,  # 一半时间用于目标情绪
+                cfg_coef=to_params.get('cfg_coef', self.config.cfg_coef)
             )
             
-            # 设置重叠时长
-            overlap_duration = min(segment_duration // 3, 5)  # 重叠时长不超过5秒
+            to_output = self.model.generate(
+                descriptions=[to_prompt],
+                progress=True
+            )
             
-<<<<<<< HEAD
             # 处理音频数据
             from_audio = from_output[0].cpu().numpy()
             to_audio = to_output[0].cpu().numpy()
@@ -634,72 +640,33 @@ class MusicGenService:
             if to_audio.shape[0] > 1:
                 to_audio = to_audio.mean(axis=0, keepdims=True)
             
-=======
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
             # 创建过渡音频 - 使用音频处理器创建平滑过渡
-            self.logger.info(f"开始创建平滑过渡，重叠时长: {overlap_duration}秒")
-            transition_start = time.time()
-            try:
-                transition_audio = self.audio_processor.create_transition(
-                    from_audio_path, 
-                    to_audio_path,
-                    overlap_seconds=overlap_duration
-                )
-                transition_end = time.time()
-                self.logger.info(f"过渡音频创建成功，耗时: {transition_end - transition_start:.2f}秒")
-                self.logger.info(f"过渡音频形状: {transition_audio.shape}, 类型: {transition_audio.dtype}, 数值范围: {np.min(transition_audio):.4f}到{np.max(transition_audio):.4f}")
-            except Exception as e:
-                self.logger.error(f"创建过渡音频失败: {str(e)}")
-                import traceback
-                self.logger.error(f"错误堆栈: {traceback.format_exc()}")
-                # 创建过渡音频失败，简单拼接两个音频
-                try:
-                    self.logger.info(f"尝试简单拼接音频...")
-                    if from_audio_path.ndim == 1:
-                        from_audio_path = from_audio_path.reshape(1, -1)
-                    if to_audio_path.ndim == 1:
-                        to_audio_path = to_audio_path.reshape(1, -1)
-                        
-                    if from_audio_path.shape[0] != to_audio_path.shape[0]:
-                        channels = min(from_audio_path.shape[0], to_audio_path.shape[0])
-                        from_audio_path = from_audio_path[:channels]
-                        to_audio_path = to_audio_path[:channels]
-                        
-                    transition_audio = np.concatenate([from_audio_path, to_audio_path], axis=1)
-                    self.logger.info(f"拼接音频成功，形状: {transition_audio.shape}")
-                except Exception as concat_error:
-                    self.logger.error(f"拼接音频失败: {str(concat_error)}")
-                    return False, None, None
-            
-            # 确保音频数据格式正确 (2D array -> 1D array 或 reshape以适应sf.write)
-            if transition_audio.ndim == 2:
-                # 如果是 [channels, samples] 格式，需要转置为 [samples, channels]
-                if transition_audio.shape[0] < transition_audio.shape[1]:
-                    transition_audio = transition_audio.T
-                    
-                # 如果是单声道，压缩为一维数组
-                if transition_audio.shape[1] == 1:
-                    transition_audio = transition_audio.squeeze(1)
-            
-            # 保存原始音频
-<<<<<<< HEAD
-            self.logger.info(f"保存原始过渡音频，形状: {transition_audio.shape}")
-=======
-            self.logger.info(f"保存原始音频到: {from_audio_path}, {to_audio_path}")
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
-            sf.write(
-                from_audio_path,
-                from_audio_path,
-                samplerate=self.config.sample_rate
+            transition_audio = self.audio_processor.create_transition(
+                from_audio, 
+                to_audio,
+                overlap_seconds=2.0  # 两秒重叠进行过渡
             )
+            
+            # 为WAV写入准备音频数据 - 确保格式正确
+            if transition_audio.ndim == 2:
+                # 如果是多通道，转置为 [samples, channels] 格式
+                if transition_audio.shape[0] <= 2:  # 通常通道数<=2
+                    transition_audio_for_writing = transition_audio.T
+                else:
+                    # 如果第一维太大，可能已经是 [samples, channels]
+                    transition_audio_for_writing = transition_audio
+            else:
+                # 如果是1D数组，保持不变
+                transition_audio_for_writing = transition_audio
+            
+            # 保存原始音频 - 使用float32格式确保兼容性
             sf.write(
-                to_audio_path,
-                to_audio_path,
+                str(raw_output_file),
+                transition_audio_for_writing.astype(np.float32),
                 samplerate=self.config.sample_rate
             )
             
             # 应用音频处理 - 使用起始和目标情绪参数的中间值
-<<<<<<< HEAD
             from_audio_params = self.get_audio_params_for_emotion(from_emotion)
             to_audio_params = self.get_audio_params_for_emotion(to_emotion)
             
@@ -724,96 +691,35 @@ class MusicGenService:
             # 应用限幅器
             processed_audio = self.audio_processor.apply_limiter(processed_audio, limiter_threshold)
             
-            # 确保处理后的音频数据格式正确
+            # 为WAV写入准备处理后的音频数据
             if processed_audio.ndim == 2:
-                # 如果是 [channels, samples] 格式，需要转置为 [samples, channels]
-                if processed_audio.shape[0] < processed_audio.shape[1]:
-                    processed_audio = processed_audio.T
-                    
-                # 如果是单声道，压缩为一维数组
-                if processed_audio.shape[1] == 1:
-                    processed_audio = processed_audio.squeeze(1)
+                # 如果是多通道，转置为 [samples, channels] 格式
+                if processed_audio.shape[0] <= 2:  # 通常通道数<=2
+                    processed_audio_for_writing = processed_audio.T
+                else:
+                    # 如果第一维太大，可能已经是 [samples, channels]
+                    processed_audio_for_writing = processed_audio
+            else:
+                # 如果是1D数组，保持不变
+                processed_audio_for_writing = processed_audio
             
-            # 保存处理后的音频文件
-            self.logger.info(f"保存处理后的过渡音频，形状: {processed_audio.shape}")
-=======
-            self.logger.info(f"应用音频处理，重叠时长: {overlap_duration}秒")
-            process_start = time.time()
-            try:
-                # 获取情绪的音频参数
-                from_audio_params = self.get_audio_params_for_emotion(from_emotion)
-                to_audio_params = self.get_audio_params_for_emotion(to_emotion)
-                
-                # 计算中间参数
-                transition_params = {
-                    "low_shelf_gain": (from_audio_params["low_shelf_gain"] + to_audio_params["low_shelf_gain"]) / 2,
-                    "mid_gain": (from_audio_params["mid_gain"] + to_audio_params["mid_gain"]) / 2,
-                    "high_shelf_gain": (from_audio_params["high_shelf_gain"] + to_audio_params["high_shelf_gain"]) / 2
-                }
-                
-                target_db = (from_audio_params["target_db"] + to_audio_params["target_db"]) / 2
-                limiter_threshold = (from_audio_params["limiter_threshold"] + to_audio_params["limiter_threshold"]) / 2
-                
-                self.logger.info(f"过渡参数: {transition_params}")
-                self.logger.info(f"目标响度: {target_db} dB, 限幅阈值: {limiter_threshold} dB")
-                
-                # 应用处理
-                process_audio_start = time.time()
-                self.logger.info(f"开始处理音频...")
-                processed_audio = self.audio_processor.process_audio(
-                    transition_audio,
-                    normalize=True,
-                    target_db=target_db,
-                    eq_params=transition_params
-                )
-                
-                # 应用限幅器
-                self.logger.info(f"应用限幅器，阈值: {limiter_threshold} dB")
-                processed_audio = self.audio_processor.apply_limiter(processed_audio, limiter_threshold)
-                process_audio_end = time.time()
-                self.logger.info(f"音频处理成功，耗时: {process_audio_end - process_audio_start:.2f}秒")
-                self.logger.info(f"处理后音频形状: {processed_audio.shape}, 数值范围: {np.min(processed_audio):.4f}到{np.max(processed_audio):.4f}")
-            except Exception as e:
-                self.logger.error(f"应用音频处理失败: {str(e)}")
-                import traceback
-                self.logger.error(f"错误堆栈: {traceback.format_exc()}")
-                # 处理失败，使用原始音频
-                processed_audio = transition_audio
-                self.logger.info(f"使用原始音频作为备选")
-                
-            # 保存处理后的音频文件
-            self.logger.info(f"保存处理后音频到: {from_audio_path}, {to_audio_path}")
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
+            # 保存处理后的音频文件 - 使用float32格式确保兼容性
             sf.write(
-                from_audio_path,
-                processed_audio,
-                samplerate=self.config.sample_rate
-            )
-            sf.write(
-                to_audio_path,
-                processed_audio,
+                str(output_file),
+                processed_audio_for_writing.astype(np.float32),
                 samplerate=self.config.sample_rate
             )
             
-            self.logger.info(f"情绪过渡音乐生成成功，总耗时: {time.time() - time.time():.2f}秒")
-            self.logger.info(f"文件保存路径: processed={from_audio_path}, raw={to_audio_path}")
-            self.logger.info(f"情绪过渡音乐生成完成")
-            return True, from_audio_path, to_audio_path
+            self.logger.info(f"过渡音乐生成成功，保存至: {output_file}")
+            return True, output_file, raw_output_file
             
         except Exception as e:
-<<<<<<< HEAD
             self.logger.error(f"过渡音乐生成失败: {str(e)}")
-            if 'from_audio' in locals() and 'to_audio' in locals():
-                self.logger.error(f"from_audio形状: {from_audio.shape}, to_audio形状: {to_audio.shape}")
+            # 记录更多的调试信息
             if 'transition_audio' in locals():
-                self.logger.error(f"transition_audio形状: {transition_audio.shape if hasattr(transition_audio, 'shape') else 'unknown'}")
-=======
-            self.logger.error(f"情绪过渡音乐生成失败: {str(e)}")
-            self.logger.error(f"总耗时(失败): {time.time() - time.time():.2f}秒")
-            import traceback
-            self.logger.error(f"错误堆栈: {traceback.format_exc()}")
-            self.logger.error(f"情绪过渡音乐生成失败")
->>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
+                self.logger.error(f"transition_audio shape: {transition_audio.shape}, dtype: {transition_audio.dtype}")
+            if 'processed_audio' in locals():
+                self.logger.error(f"processed_audio shape: {processed_audio.shape}, dtype: {processed_audio.dtype}")
             return False, None, None
     
     def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -939,61 +845,6 @@ class MusicGenService:
         # 生成音乐
         success, audio_path, raw_audio_path = self.generate_music(result['music_prompt'])
         return success, result, audio_path
-
-    def load_model(self, model_name='facebook/musicgen-small'):
-        try:
-            self.model = MusicGen.get_pretrained(model_name)
-            self.model.to(device)
-        except Exception as e:
-            logging.error(f"加载模型失败: {str(e)}")
-            raise
-            
-    def generate_transition(self, emotion_text, duration):
-        try:
-            if self.model is None:
-                self.load_model()
-                
-            # 确保 processor 存在
-            if not hasattr(self, 'processor'):
-                # 如果没有 processor，使用直接的字符串作为输入
-                descriptions = [emotion_text]
-                self.logger.info(f"生成过渡音乐，使用描述: {descriptions}")
-                
-                audio = self.model.generate(
-                    descriptions=descriptions,
-                    progress=True,
-                    duration=duration
-                )
-            else:
-                # 如果有 processor，使用处理后的输入
-                self.logger.info(f"生成过渡音乐，使用处理器处理文本: {emotion_text}")
-                inputs = self.processor(
-                    text=[emotion_text],
-                    padding=True,
-                    return_tensors="pt",
-                ).to("cuda" if torch.cuda.is_available() else "cpu")
-                
-                audio = self.model.generate(
-                    **inputs,
-                    max_new_tokens=duration * 50,  # 根据持续时间调整生成长度
-                    do_sample=True,
-                    guidance_scale=3.0
-                )
-            
-            # 初始化self_wav
-            if not hasattr(self, 'self_wav'):
-                self.self_wav = None
-                
-            # 保存生成的音频
-            self.self_wav = audio.cpu().numpy().squeeze()
-            
-            return True, self.self_wav
-            
-        except Exception as e:
-            self.logger.error(f"生成情绪过渡音乐失败: {str(e)}")
-            import traceback
-            self.logger.error(f"错误堆栈: {traceback.format_exc()}")
-            return False, str(e)
 
 def create_service(api_key: Optional[str] = None, model_name: str = 'facebook/musicgen-small', duration: int = 10, use_sampling: bool = True, top_k: int = 250, temperature: float = 1.0, cfg_coef: float = 3.0, output_dir: str = './generated_music', progress_callback=None) -> MusicGenService:
     """
