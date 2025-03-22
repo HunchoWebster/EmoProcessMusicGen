@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
     <title>情绪过渡音乐生成器</title>
+=======
+    <title>情绪转换音乐生成器</title>
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -18,11 +22,14 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             margin-top: 50px;
         }
+<<<<<<< HEAD
         .navbar {
             margin-bottom: 30px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
+=======
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
         .status {
             margin: 20px 0;
             padding: 10px;
@@ -36,12 +43,15 @@
             background-color: #f8d7da;
             color: #721c24;
         }
+<<<<<<< HEAD
         .prompt {
             background-color: #e2e3e5;
             padding: 10px;
             border-radius: 5px;
             margin: 10px 0;
         }
+=======
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
         .loading {
             display: none;
             text-align: center;
@@ -54,6 +64,7 @@
         .progress-bar {
             transition: width 0.5s ease;
         }
+<<<<<<< HEAD
         .emotion-selector {
             margin-bottom: 15px;
             padding: 15px;
@@ -70,10 +81,13 @@
             margin-bottom: 20px;
             border-left: 4px solid #007bff;
         }
+=======
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
     </style>
 </head>
 <body>
     <div class="container">
+<<<<<<< HEAD
         <!-- 添加导航栏 -->
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
             <div class="container-fluid">
@@ -308,10 +322,154 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+=======
+        <h1 class="text-center mb-4">情绪转换音乐生成器</h1>
+        
+        <div class="mb-3">
+            <label for="transitionEmotionText" class="form-label">请描述您当前的情绪状态：</label>
+            <textarea class="form-control" id="transitionEmotionText" rows="3" 
+                      placeholder="例如：今天工作压力很大，需要放松"></textarea>
+        </div>
+        
+        <div class="mb-3">
+            <label for="transitionDuration" class="form-label">过渡时长 (秒)</label>
+            <input type="range" class="form-range" id="transitionDuration" min="10" max="60" step="5" value="30">
+            <div class="text-center" id="transitionDurationValue">30 秒</div>
+        </div>
+        
+        <div id="transition-status" class="alert" style="display: none;"></div>
+        
+        <div id="transition-result-card" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>原始音频</h5>
+                    <audio id="transition-raw-audio-player" controls>
+                        您的浏览器不支持音频播放
+                    </audio>
+                </div>
+                <div class="col-md-6">
+                    <h5>处理后音频</h5>
+                    <audio id="transition-audio-player" controls>
+                        您的浏览器不支持音频播放
+                    </audio>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <button class="btn btn-primary" id="generateTransition">生成情绪过渡音乐</button>
+        </div>
+    </div>
+
+    <script>
+        // 更新过渡时长显示
+        document.getElementById('transitionDuration').addEventListener('input', function() {
+            document.getElementById('transitionDurationValue').textContent = this.value + ' 秒';
+        });
+
+        // 情绪转换功能相关代码
+        document.getElementById('generateTransition').addEventListener('click', async function() {
+            const emotionText = document.getElementById('transitionEmotionText').value.trim();
+            const transitionDuration = document.getElementById('transitionDuration').value;
+            const statusElement = document.getElementById('transition-status');
+            const transitionResultCard = document.getElementById('transition-result-card');
+            const audioPlayer = document.getElementById('transition-audio-player');
+            const rawAudioPlayer = document.getElementById('transition-raw-audio-player');
+            
+            console.log(`[${new Date().toISOString()}] 情绪过渡音乐按钮点击`);
+            console.log(`[${new Date().toISOString()}] 参数: emotionText=${emotionText}, transitionDuration=${transitionDuration}`);
+            
+            if (!emotionText) {
+                console.error(`[${new Date().toISOString()}] 错误: 情绪描述为空`);
+                statusElement.textContent = '请先填写当前情绪描述';
+                statusElement.className = 'alert alert-danger';
+                statusElement.style.display = 'block';
+                return;
+            }
+            
+            try {
+                // 修改按钮状态
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 正在分析情绪...';
+                statusElement.textContent = '正在分析情绪并生成提示词...';
+                statusElement.className = 'alert alert-info';
+                statusElement.style.display = 'block';
+                
+                const generateStartTime = new Date();
+                console.log(`[${generateStartTime.toISOString()}] 开始生成情绪提示词，发送请求到/test端点`);
+                
+                // 先调用 /test 测试后端是否可用
+                const testStartTime = new Date();
+                const testResponse = await fetch('/test', {
+                    method: 'GET'
+                });
+                const testEndTime = new Date();
+                const testElapsedMs = testEndTime - testStartTime;
+                
+                if (!testResponse.ok) {
+                    const testErrorText = await testResponse.text();
+                    console.error(`[${new Date().toISOString()}] /test 请求失败: 状态码=${testResponse.status}, 响应=${testErrorText}`);
+                    throw new Error(`服务器连接失败，状态码: ${testResponse.status}`);
+                }
+                
+                const testResult = await testResponse.json();
+                console.log(`[${new Date().toISOString()}] /test 请求成功，耗时: ${testElapsedMs}ms, 响应=`, testResult);
+                
+                // 调用 /generate 生成情绪提示词
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 正在生成提示词...';
+                statusElement.textContent = '正在生成音乐提示词...';
+                
+                const generatePromptStartTime = new Date();
+                console.log(`[${generatePromptStartTime.toISOString()}] 发送请求到/generate端点，数据:`, {emotion_text: emotionText});
+                
+                const generateResponse = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        emotion_text: emotionText
+                    })
+                });
+                
+                const generatePromptEndTime = new Date();
+                const generatePromptElapsedMs = generatePromptEndTime - generatePromptStartTime;
+                
+                if (!generateResponse.ok) {
+                    const generateErrorText = await generateResponse.text();
+                    console.error(`[${new Date().toISOString()}] /generate 请求失败: 状态码=${generateResponse.status}, 响应=${generateErrorText}`);
+                    throw new Error(`提示词生成失败，状态码: ${generateResponse.status}`);
+                }
+                
+                const generateResult = await generateResponse.json();
+                console.log(`[${new Date().toISOString()}] /generate 请求成功，耗时: ${generatePromptElapsedMs}ms, 响应=`, generateResult);
+                
+                if (!generateResult.success) {
+                    console.error(`[${new Date().toISOString()}] 提示词生成失败，服务返回: success=false, error=${generateResult.error}`);
+                    throw new Error(`提示词生成失败: ${generateResult.error || '未知错误'}`);
+                }
+                
+                // 获取起始提示词和目标提示词
+                const fromEmotion = generateResult.emotion_label;
+                const toEmotion = 'stress'; // 目标情绪改为 stress
+                const fromPrompt = generateResult.prompt;
+                const toPrompt = '轻松平和的音乐，像是在森林中漫步，阳光透过树叶，感受微风，心情平和';
+                
+                console.log(`[${new Date().toISOString()}] 提示词生成成功，从'${fromEmotion}'过渡到'${toEmotion}'`);
+                console.log(`[${new Date().toISOString()}] 起始提示词: ${fromPrompt}`);
+                console.log(`[${new Date().toISOString()}] 目标提示词: ${toPrompt}`);
+                
+                // 生成音乐
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 正在生成音乐...';
+                statusElement.textContent = '正在生成情绪过渡音乐，这可能需要几分钟...';
+                
+                const requestData = {
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
                     from_emotion: fromEmotion,
                     to_emotion: toEmotion,
                     from_prompt: fromPrompt,
                     to_prompt: toPrompt,
+<<<<<<< HEAD
                     duration: duration
                 })
             })
@@ -383,6 +541,90 @@
             status.className = isSuccess ? 'alert alert-success' : 'alert alert-danger';
             status.style.display = 'block';
         }
+=======
+                    transition_duration: parseInt(transitionDuration, 10)
+                };
+                
+                console.log(`[${new Date().toISOString()}] 发送请求到/generate_transition端点，数据:`, requestData);
+                const musicStartTime = new Date();
+                
+                const musicResponse = await fetch('/generate_transition', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const musicEndTime = new Date();
+                const musicElapsedMs = musicEndTime - musicStartTime;
+                const totalElapsedMs = musicEndTime - generateStartTime;
+                
+                if (!musicResponse.ok) {
+                    const musicErrorText = await musicResponse.text();
+                    console.error(`[${new Date().toISOString()}] /generate_transition 请求失败: 状态码=${musicResponse.status}, 响应=${musicErrorText}`);
+                    throw new Error(`音乐生成失败，状态码: ${musicResponse.status}`);
+                }
+                
+                const musicResult = await musicResponse.json();
+                console.log(`[${new Date().toISOString()}] /generate_transition 请求成功，耗时: ${musicElapsedMs}ms, 总耗时: ${totalElapsedMs}ms, 响应=`, musicResult);
+                
+                if (musicResult.status !== 'success') {
+                    console.error(`[${new Date().toISOString()}] 音乐生成失败，服务返回: status=${musicResult.status}, error=${musicResult.error}`);
+                    throw new Error(`音乐生成失败: ${musicResult.error || '未知错误'}`);
+                }
+                
+                // 更新界面
+                this.disabled = false;
+                this.innerHTML = '生成情绪过渡音乐';
+                statusElement.textContent = '情绪过渡音乐生成成功！';
+                statusElement.className = 'alert alert-success';
+                transitionResultCard.style.display = 'block';
+                
+                // 设置音频播放器
+                const processedAudioPath = musicResult.processed_audio;
+                const rawAudioPath = musicResult.raw_audio;
+                
+                console.log(`[${new Date().toISOString()}] 音频路径: processed=${processedAudioPath}, raw=${rawAudioPath}`);
+                
+                if (processedAudioPath) {
+                    audioPlayer.src = processedAudioPath;
+                    audioPlayer.style.display = 'block';
+                    
+                    // 尝试自动播放
+                    try {
+                        console.log(`[${new Date().toISOString()}] 尝试自动播放处理后的音频`);
+                        const playPromise = audioPlayer.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log(`[${new Date().toISOString()}] 自动播放成功`);
+                            }).catch(error => {
+                                console.log(`[${new Date().toISOString()}] 自动播放失败: ${error.message}`);
+                            });
+                        }
+                    } catch (error) {
+                        console.log(`[${new Date().toISOString()}] 自动播放出错: ${error.message}`);
+                    }
+                }
+                
+                if (rawAudioPath) {
+                    rawAudioPlayer.src = rawAudioPath;
+                    rawAudioPlayer.style.display = 'block';
+                }
+                
+                console.log(`[${new Date().toISOString()}] 情绪过渡音乐生成完成，总耗时: ${totalElapsedMs}ms`);
+                
+            } catch (error) {
+                console.error(`[${new Date().toISOString()}] 生成过程中出错: ${error.message}`);
+                console.error(error);
+                
+                this.disabled = false;
+                this.innerHTML = '生成情绪过渡音乐';
+                statusElement.textContent = `生成失败: ${error.message}`;
+                statusElement.className = 'alert alert-danger';
+            }
+        });
+>>>>>>> b9a2a286e64c2c50619d59d32c47e010cb8c64a8
     </script>
 </body>
 </html> 
