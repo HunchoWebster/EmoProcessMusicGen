@@ -321,7 +321,18 @@ class MusicGenService:
     def _configure_style_conditioner(self):
         """配置风格条件器参数"""
         try:
-            # 判断模型是否有风格条件器
+            # 对于musicgen-small模型，直接设置参数
+            if 'musicgen-small' in self.config.model_name:
+                params = self.config.style_params
+                self.model.set_style_conditioner_params(
+                    eval_q=params['eval_q'],
+                    excerpt_length=params['excerpt_length'],
+                    ds_factor=params['ds_factor']
+                )
+                self.logger.info(f"风格条件器参数已设置: {params}")
+                return
+                
+            # 对于其他模型，检查是否有风格条件器
             if hasattr(self.model.lm, 'condition_provider') and \
                hasattr(self.model.lm.condition_provider, 'conditioners') and \
                'self_wav' in self.model.lm.condition_provider.conditioners:
@@ -353,7 +364,7 @@ class MusicGenService:
         try:
             preset = EMOTION_PRESET_PARAMS[emotion_label]
             
-            # 更新模型参数（不再设置duration）
+            # 更新模型参数
             model_params = preset['model_params']
             self.model.set_generation_params(
                 use_sampling=self.config.use_sampling,
@@ -363,15 +374,6 @@ class MusicGenService:
                 cfg_coef=model_params.get('cfg_coef', self.config.cfg_coef)
             )
             
-            # 更新风格条件器参数
-            if 'musicgen-small' in self.config.model_name:
-                style_params = preset['style_params']
-                self.model.set_style_conditioner_params(
-                    eval_q=style_params.get('eval_q', 3),
-                    excerpt_length=style_params.get('excerpt_length', 3.0),
-                    ds_factor=style_params.get('ds_factor', None)
-                )
-                
             self.current_emotion_label = emotion_label
             self.logger.info(f"已应用情绪标签 '{emotion_label}' 的预设参数")
             return True
@@ -576,6 +578,9 @@ class MusicGenService:
             return False, None, None
             
         try:
+            # 确保transition_duration是整数
+            transition_duration = int(transition_duration)
+            
             # 生成唯一的文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = os.path.join(self.output_dir, f"transition_music_{timestamp}.wav")
@@ -617,16 +622,24 @@ class MusicGenService:
             from_audio = from_output[0].cpu().numpy()
             to_audio = to_output[0].cpu().numpy()
             
+            # 确保音频数据是2D的 [channels, samples]
             if from_audio.ndim == 3:
                 from_audio = from_audio.squeeze(0)
             if to_audio.ndim == 3:
                 to_audio = to_audio.squeeze(0)
-                
-            if from_audio.ndim == 2 and from_audio.shape[0] < from_audio.shape[1]:
+            
+            # 确保通道维度在正确的位置
+            if from_audio.ndim == 2 and from_audio.shape[1] < from_audio.shape[0]:
                 from_audio = from_audio.T
-            if to_audio.ndim == 2 and to_audio.shape[0] < to_audio.shape[1]:
+            if to_audio.ndim == 2 and to_audio.shape[1] < to_audio.shape[0]:
                 to_audio = to_audio.T
-                
+            
+            # 确保音频数据是单声道的
+            if from_audio.shape[0] > 1:
+                from_audio = from_audio.mean(axis=0, keepdims=True)
+            if to_audio.shape[0] > 1:
+                to_audio = to_audio.mean(axis=0, keepdims=True)
+            
             # 创建过渡音频 - 使用音频处理器创建平滑过渡
             transition_audio = self.audio_processor.create_transition(
                 from_audio, 
@@ -634,7 +647,18 @@ class MusicGenService:
                 overlap_seconds=2.0  # 两秒重叠进行过渡
             )
             
+            # 确保音频数据格式正确 (2D array -> 1D array 或 reshape以适应sf.write)
+            if transition_audio.ndim == 2:
+                # 如果是 [channels, samples] 格式，需要转置为 [samples, channels]
+                if transition_audio.shape[0] < transition_audio.shape[1]:
+                    transition_audio = transition_audio.T
+                    
+                # 如果是单声道，压缩为一维数组
+                if transition_audio.shape[1] == 1:
+                    transition_audio = transition_audio.squeeze(1)
+            
             # 保存原始音频
+            self.logger.info(f"保存原始过渡音频，形状: {transition_audio.shape}")
             sf.write(
                 str(raw_output_file),
                 transition_audio,
@@ -666,7 +690,18 @@ class MusicGenService:
             # 应用限幅器
             processed_audio = self.audio_processor.apply_limiter(processed_audio, limiter_threshold)
             
+            # 确保处理后的音频数据格式正确
+            if processed_audio.ndim == 2:
+                # 如果是 [channels, samples] 格式，需要转置为 [samples, channels]
+                if processed_audio.shape[0] < processed_audio.shape[1]:
+                    processed_audio = processed_audio.T
+                    
+                # 如果是单声道，压缩为一维数组
+                if processed_audio.shape[1] == 1:
+                    processed_audio = processed_audio.squeeze(1)
+            
             # 保存处理后的音频文件
+            self.logger.info(f"保存处理后的过渡音频，形状: {processed_audio.shape}")
             sf.write(
                 str(output_file),
                 processed_audio,
@@ -678,6 +713,10 @@ class MusicGenService:
             
         except Exception as e:
             self.logger.error(f"过渡音乐生成失败: {str(e)}")
+            if 'from_audio' in locals() and 'to_audio' in locals():
+                self.logger.error(f"from_audio形状: {from_audio.shape}, to_audio形状: {to_audio.shape}")
+            if 'transition_audio' in locals():
+                self.logger.error(f"transition_audio形状: {transition_audio.shape if hasattr(transition_audio, 'shape') else 'unknown'}")
             return False, None, None
     
     def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:

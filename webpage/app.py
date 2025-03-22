@@ -146,6 +146,10 @@ def before_request():
 def index():
     return render_template('index.html')
 
+@app.route('/transition')
+def transition():
+    return render_template('transition.html')
+
 @app.route('/progress', methods=['GET'])
 def get_progress():
     """获取生成进度"""
