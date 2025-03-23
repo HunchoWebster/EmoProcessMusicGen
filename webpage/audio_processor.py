@@ -77,8 +77,8 @@ class AudioProcessor:
         try:
             processed_audio = audio.copy()
             
-            # 检查音频长度是否足够 - 增加最小长度到64
-            min_length = 64  # 增加最小长度以确保满足filtfilt需求
+            # 检查音频长度是否足够 - 增加最小长度到128
+            min_length = 128  # 增加最小长度以确保满足filtfilt需求
             
             # 检查是否需要应用EQ
             apply_eq_needed = (low_shelf_gain != 0 or mid_gain != 0 or high_shelf_gain != 0)
@@ -87,29 +87,41 @@ class AudioProcessor:
             if not apply_eq_needed:
                 return processed_audio
                 
-            # 如果需要EQ但音频太短，进行填充
+            # 检查音频维度，确保是一维数组
+            if processed_audio.ndim > 1:
+                # 如果是多通道，处理每个通道
+                channels = []
+                for channel in range(processed_audio.shape[-1]):
+                    channel_data = processed_audio[:, channel]
+                    # 对每个通道应用处理
+                    if len(channel_data) < min_length:
+                        self.logger.warning(f"通道 {channel} 音频长度({len(channel_data)})太短，进行填充至{min_length}个采样点")
+                        pad_length = min_length - len(channel_data)
+                        channel_data = np.pad(channel_data, (0, pad_length), mode='constant')
+                    
+                    # 应用滤波器处理通道数据
+                    channel_data = self._apply_filters(channel_data, low_shelf_gain, mid_gain, high_shelf_gain,
+                                                       low_freq, mid_low_freq, mid_high_freq, high_freq)
+                    
+                    # 如果之前进行了填充，现在需要移除填充部分
+                    if len(channel_data) > len(audio):
+                        channel_data = channel_data[:len(audio)]
+                        
+                    channels.append(channel_data)
+                
+                # 重新组合多通道
+                processed_audio = np.column_stack(channels)
+                return processed_audio
+            
+            # 一维数组处理
             if len(processed_audio) < min_length:
                 self.logger.warning(f"音频长度({len(processed_audio)})太短，进行填充至{min_length}个采样点")
                 pad_length = min_length - len(processed_audio)
-                processed_audio = np.pad(processed_audio, (0, pad_length), mode='edge')
+                processed_audio = np.pad(processed_audio, (0, pad_length), mode='constant')
             
-            # 设计低架滤波器
-            if low_shelf_gain != 0:
-                b, a = signal.butter(2, low_freq/(self.sample_rate/2), btype='low')
-                low_freq_audio = signal.filtfilt(b, a, processed_audio)
-                processed_audio = processed_audio + (low_freq_audio * (10 ** (low_shelf_gain / 20) - 1))
-                
-            # 设计中频滤波器
-            if mid_gain != 0:
-                b, a = signal.butter(2, [mid_low_freq/(self.sample_rate/2), mid_high_freq/(self.sample_rate/2)], btype='band')
-                mid_freq_audio = signal.filtfilt(b, a, processed_audio)
-                processed_audio = processed_audio + (mid_freq_audio * (10 ** (mid_gain / 20) - 1))
-                
-            # 设计高架滤波器
-            if high_shelf_gain != 0:
-                b, a = signal.butter(2, high_freq/(self.sample_rate/2), btype='high')
-                high_freq_audio = signal.filtfilt(b, a, processed_audio)
-                processed_audio = processed_audio + (high_freq_audio * (10 ** (high_shelf_gain / 20) - 1))
+            # 应用滤波器
+            processed_audio = self._apply_filters(processed_audio, low_shelf_gain, mid_gain, high_shelf_gain,
+                                                  low_freq, mid_low_freq, mid_high_freq, high_freq)
             
             # 如果之前进行了填充，现在需要移除填充部分
             if len(processed_audio) > len(audio):
@@ -119,8 +131,54 @@ class AudioProcessor:
             
         except Exception as e:
             self.logger.error(f"均衡器处理失败: {str(e)}")
-            self.logger.error(f"音频长度: {len(audio)}, 需要大于15")
+            self.logger.error(f"音频长度: {len(audio)}, 需要大于{min_length}")
             return audio
+    
+    def _apply_filters(self, audio_data: np.ndarray, 
+                       low_shelf_gain: float,
+                       mid_gain: float,
+                       high_shelf_gain: float,
+                       low_freq: float,
+                       mid_low_freq: float,
+                       mid_high_freq: float,
+                       high_freq: float) -> np.ndarray:
+        """
+        对音频数据应用滤波器
+        
+        Args:
+            audio_data: 单通道音频数据
+            low_shelf_gain: 低频增益
+            mid_gain: 中频增益
+            high_shelf_gain: 高频增益
+            low_freq: 低频截止频率
+            mid_low_freq: 中频下限频率
+            mid_high_freq: 中频上限频率
+            high_freq: 高频截止频率
+            
+        Returns:
+            np.ndarray: 应用滤波器后的音频数据
+        """
+        processed_data = audio_data.copy()
+        
+        # 设计低架滤波器
+        if low_shelf_gain != 0:
+            b, a = signal.butter(2, low_freq/(self.sample_rate/2), btype='low')
+            low_freq_audio = signal.filtfilt(b, a, processed_data)
+            processed_data = processed_data + (low_freq_audio * (10 ** (low_shelf_gain / 20) - 1))
+            
+        # 设计中频滤波器
+        if mid_gain != 0:
+            b, a = signal.butter(2, [mid_low_freq/(self.sample_rate/2), mid_high_freq/(self.sample_rate/2)], btype='band')
+            mid_freq_audio = signal.filtfilt(b, a, processed_data)
+            processed_data = processed_data + (mid_freq_audio * (10 ** (mid_gain / 20) - 1))
+            
+        # 设计高架滤波器
+        if high_shelf_gain != 0:
+            b, a = signal.butter(2, high_freq/(self.sample_rate/2), btype='high')
+            high_freq_audio = signal.filtfilt(b, a, processed_data)
+            processed_data = processed_data + (high_freq_audio * (10 ** (high_shelf_gain / 20) - 1))
+            
+        return processed_data
             
     def apply_limiter(self, audio: np.ndarray, threshold_db: float = -1.0) -> np.ndarray:
         """

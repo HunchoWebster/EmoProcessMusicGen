@@ -352,19 +352,34 @@ class MusicGenService:
                 return
                 
             # 对于其他模型，检查是否有风格条件器
+            # 更安全的检查方式
             if hasattr(self.model.lm, 'condition_provider') and \
-               hasattr(self.model.lm.condition_provider, 'conditioners') and \
-               'self_wav' in self.model.lm.condition_provider.conditioners:
+               hasattr(self.model.lm.condition_provider, 'conditioners'):
                 
-                params = self.config.style_params
-                self.model.set_style_conditioner_params(
-                    eval_q=params['eval_q'],
-                    excerpt_length=params['excerpt_length'],
-                    ds_factor=params['ds_factor']
-                )
-                self.logger.info(f"风格条件器参数已设置: {params}")
+                conditioners = self.model.lm.condition_provider.conditioners
+                # 检查是否为ModuleDict类型且包含self_wav键
+                if hasattr(conditioners, 'keys') and 'self_wav' in conditioners.keys():
+                    params = self.config.style_params
+                    self.model.set_style_conditioner_params(
+                        eval_q=params['eval_q'],
+                        excerpt_length=params['excerpt_length'],
+                        ds_factor=params['ds_factor']
+                    )
+                    self.logger.info(f"风格条件器参数已设置: {params}")
+                else:
+                    self.logger.info(f"当前模型 {self.config.model_name} 的条件器中不包含self_wav，跳过风格参数设置")
+            else:
+                self.logger.info(f"当前模型 {self.config.model_name} 不支持风格条件器参数设置")
         except Exception as e:
             self.logger.error(f"设置风格条件器参数失败: {str(e)}")
+            # 记录更详细的调试信息
+            import traceback
+            self.logger.debug(f"错误堆栈: {traceback.format_exc()}")
+            if hasattr(self.model.lm, 'condition_provider'):
+                if hasattr(self.model.lm.condition_provider, 'conditioners'):
+                    self.logger.debug(f"条件器类型: {type(self.model.lm.condition_provider.conditioners)}")
+                    if hasattr(self.model.lm.condition_provider.conditioners, 'keys'):
+                        self.logger.debug(f"条件器键: {self.model.lm.condition_provider.conditioners.keys()}")
     
     def apply_emotion_preset(self, emotion_label: str) -> bool:
         """
@@ -393,12 +408,45 @@ class MusicGenService:
                 cfg_coef=model_params.get('cfg_coef', self.config.cfg_coef)
             )
             
+            # 安全地设置风格条件器参数（如果存在的话）
+            try:
+                style_params = preset.get('style_params')
+                if style_params and hasattr(self.model, 'set_style_conditioner_params'):
+                    # 检查模型是否支持风格参数
+                    has_style_conditioner = False
+                    
+                    # 检查musicgen-small模型
+                    if 'musicgen-small' in self.config.model_name:
+                        has_style_conditioner = True
+                    # 检查其他模型的条件器
+                    elif (hasattr(self.model.lm, 'condition_provider') and 
+                          hasattr(self.model.lm.condition_provider, 'conditioners')):
+                        conditioners = self.model.lm.condition_provider.conditioners
+                        if hasattr(conditioners, 'keys') and 'self_wav' in conditioners.keys():
+                            has_style_conditioner = True
+                    
+                    # 如果有风格条件器，则设置参数
+                    if has_style_conditioner:
+                        self.model.set_style_conditioner_params(
+                            eval_q=style_params.get('eval_q', 3),
+                            excerpt_length=style_params.get('excerpt_length', 3.0),
+                            ds_factor=style_params.get('ds_factor', None)
+                        )
+                        self.logger.info(f"已应用风格条件器参数: {style_params}")
+                    else:
+                        self.logger.info(f"当前模型不支持风格条件器参数，跳过设置")
+            except Exception as style_err:
+                # 如果设置风格参数失败，只记录日志但不影响其他参数的应用
+                self.logger.warning(f"应用风格条件器参数失败: {str(style_err)}")
+            
             self.current_emotion_label = emotion_label
             self.logger.info(f"已应用情绪标签 '{emotion_label}' 的预设参数")
             return True
             
         except Exception as e:
             self.logger.error(f"应用情绪预设失败: {str(e)}")
+            import traceback
+            self.logger.error(f"错误堆栈: {traceback.format_exc()}")
             return False
     
     def create_prompt(self, emotion_text: str) -> Optional[dict]:

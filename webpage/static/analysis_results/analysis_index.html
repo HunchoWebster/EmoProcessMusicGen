@@ -1,0 +1,318 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>音频处理效果分析</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+            h1, h2 { color: #333; }
+            .case-container { margin-bottom: 40px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+            .comparison-img { max-width: 100%; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+            .audio-container { display: flex; gap: 20px; margin-bottom: 20px; }
+            .audio-item { flex: 1; }
+            .audio-item audio { width: 100%; }
+            h3 { margin-top: 10px; margin-bottom: 5px; }
+        </style>
+    </head>
+    <body>
+        <h1>音频处理效果分析报告</h1>
+        <p>本报告对比分析了原始音频和经过音频处理模块处理后的音频，展示了处理前后的差异。</p>
+        
+        <h2>整体分析结果</h2>
+        <img src="average_changes.png" alt="平均变化图表" class="comparison-img">
+        <p>上图展示了音频处理对各个音频特征的平均影响（百分比变化）。</p>
+        
+        <h2>各案例详细分析</h2>
+    
+        <div class="case-container">
+            <h2>案例: anxiety_test1_20250323_154816</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/anxiety_test1_20250323_154816_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/anxiety_test1_20250323_154816_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="anxiety_test1_20250323_154816_comparison.png" alt="anxiety_test1_20250323_154816 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: anxiety_test2_20250323_154849</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/anxiety_test2_20250323_154849_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/anxiety_test2_20250323_154849_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="anxiety_test2_20250323_154849_comparison.png" alt="anxiety_test2_20250323_154849 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: calm_test1_20250323_155303</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/calm_test1_20250323_155303_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/calm_test1_20250323_155303_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="calm_test1_20250323_155303_comparison.png" alt="calm_test1_20250323_155303 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: calm_test2_20250323_155342</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/calm_test2_20250323_155342_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/calm_test2_20250323_155342_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="calm_test2_20250323_155342_comparison.png" alt="calm_test2_20250323_155342 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: depression_test1_20250323_154922</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/depression_test1_20250323_154922_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/depression_test1_20250323_154922_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="depression_test1_20250323_154922_comparison.png" alt="depression_test1_20250323_154922 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: depression_test2_20250323_154955</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/depression_test2_20250323_154955_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/depression_test2_20250323_154955_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="depression_test2_20250323_154955_comparison.png" alt="depression_test2_20250323_154955 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: distraction_test1_20250323_155418</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/distraction_test1_20250323_155418_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/distraction_test1_20250323_155418_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="distraction_test1_20250323_155418_comparison.png" alt="distraction_test1_20250323_155418 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: distraction_test2_20250323_155452</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/distraction_test2_20250323_155452_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/distraction_test2_20250323_155452_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="distraction_test2_20250323_155452_comparison.png" alt="distraction_test2_20250323_155452 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: insomnia_test1_20250323_155029</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/insomnia_test1_20250323_155029_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/insomnia_test1_20250323_155029_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="insomnia_test1_20250323_155029_comparison.png" alt="insomnia_test1_20250323_155029 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: insomnia_test2_20250323_155105</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/insomnia_test2_20250323_155105_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/insomnia_test2_20250323_155105_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="insomnia_test2_20250323_155105_comparison.png" alt="insomnia_test2_20250323_155105 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: pain_test1_20250323_155528</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/pain_test1_20250323_155528_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/pain_test1_20250323_155528_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="pain_test1_20250323_155528_comparison.png" alt="pain_test1_20250323_155528 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: pain_test2_20250323_155604</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/pain_test2_20250323_155604_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/pain_test2_20250323_155604_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="pain_test2_20250323_155604_comparison.png" alt="pain_test2_20250323_155604 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: ptsd_test1_20250323_155641</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/ptsd_test1_20250323_155641_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/ptsd_test1_20250323_155641_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="ptsd_test1_20250323_155641_comparison.png" alt="ptsd_test1_20250323_155641 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: ptsd_test2_20250323_155717</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/ptsd_test2_20250323_155717_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/ptsd_test2_20250323_155717_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="ptsd_test2_20250323_155717_comparison.png" alt="ptsd_test2_20250323_155717 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: stress_test1_20250323_155144</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/stress_test1_20250323_155144_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/stress_test1_20250323_155144_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="stress_test1_20250323_155144_comparison.png" alt="stress_test1_20250323_155144 对比分析" class="comparison-img">
+        </div>
+        
+        <div class="case-container">
+            <h2>案例: stress_test2_20250323_155222</h2>
+            
+            <div class="audio-container">
+                <div class="audio-item">
+                    <h3>原始音频</h3>
+                    <audio controls src="../test_emotion_audio/stress_test2_20250323_155222_no_processing.wav"></audio>
+                </div>
+                <div class="audio-item">
+                    <h3>处理后音频</h3>
+                    <audio controls src="../test_emotion_audio/stress_test2_20250323_155222_audio_processing_only.wav"></audio>
+                </div>
+            </div>
+            
+            <h3>详细分析</h3>
+            <img src="stress_test2_20250323_155222_comparison.png" alt="stress_test2_20250323_155222 对比分析" class="comparison-img">
+        </div>
+        
+    </body>
+    </html>
+    
