@@ -226,9 +226,12 @@ class AudioProcessor:
                 overlap_samples = 1
                 self.logger.warning("重叠长度太短，使用最小值1")
             
-            # 创建重叠部分的淡入淡出窗口
-            fade_in = np.linspace(0, 1, overlap_samples)
-            fade_out = np.linspace(1, 0, overlap_samples)
+            # 使用S型曲线（sin^2）创建淡入淡出曲线，实现更平滑的渐变
+            fade_in = np.sin(np.linspace(0, np.pi/2, overlap_samples))**2  # 渐强曲线
+            fade_out = np.sin(np.linspace(np.pi/2, 0, overlap_samples))**2  # 渐弱曲线
+            
+            # 记录淡变曲线信息
+            self.logger.info(f"创建过渡: 重叠样本数={overlap_samples}, 重叠时间={overlap_seconds}秒, 使用S型渐变曲线")
             
             # 计算最终音频的长度
             total_length = from_audio.shape[1] + to_audio.shape[1] - overlap_samples
@@ -236,16 +239,36 @@ class AudioProcessor:
             # 创建结果数组
             result = np.zeros((from_audio.shape[0], total_length), dtype=np.float32)
             
-            # 复制第一段音频（除了重叠部分用淡出处理）
+            # 规范化音频音量以确保两段音频的音量水平相似
+            from_max = np.max(np.abs(from_audio))
+            to_max = np.max(np.abs(to_audio))
+            
+            if from_max > 0 and to_max > 0:
+                # 将两段音频调整到相同的平均音量
+                avg_max = (from_max + to_max) / 2
+                from_audio = from_audio * (avg_max / from_max)
+                to_audio = to_audio * (avg_max / to_max)
+            
+            # 复制第一段音频（除了重叠部分使用渐弱曲线）
             result[:, :from_audio.shape[1]] = from_audio
             for i in range(from_audio.shape[0]):
                 result[i, from_audio.shape[1]-overlap_samples:from_audio.shape[1]] *= fade_out
             
-            # 复制第二段音频（开始部分用淡入处理）
+            # 复制第二段音频（开始部分使用渐强曲线）
             offset = from_audio.shape[1] - overlap_samples
             result[:, offset:offset+to_audio.shape[1]] += to_audio
             for i in range(to_audio.shape[0]):
                 result[i, offset:offset+overlap_samples] *= fade_in
+            
+            # 平滑重叠区域避免可能的音量峰值
+            # 检查并处理可能的音量峰值
+            overlap_region = result[:, offset:offset+overlap_samples]
+            max_amplitude = np.max(np.abs(overlap_region))
+            if max_amplitude > 1.0:
+                # 如果重叠区域的音量超过1.0，进行轻微压缩
+                scale_factor = 0.95 / max_amplitude
+                result[:, offset:offset+overlap_samples] *= scale_factor
+                self.logger.info(f"重叠区域音量调整: 最大振幅 {max_amplitude} 调整为 {max_amplitude * scale_factor}")
             
             # 确保输出数据使用float32类型，soundfile库需要此类型
             result = result.astype(np.float32)

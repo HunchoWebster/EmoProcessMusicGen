@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import soundfile as sf
 import time
+import numpy as np
 
 # 忽略警告
 warnings.filterwarnings('ignore')
@@ -439,6 +440,128 @@ def process_audio():
     except Exception as e:
         print(f"音频处理错误: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/generate_transition_to_calm', methods=['POST'])
+def generate_transition_to_calm():
+    """从当前情绪过渡到平静情绪的音乐生成路由"""
+    try:
+        # 获取参数
+        emotion_text = request.json.get('emotion_text', '')
+        transition_duration = request.json.get('duration', 30)
+        
+        # 验证参数
+        if not emotion_text:
+            return jsonify({'success': False, 'error': '缺少情绪描述'})
+        
+        # 检查服务是否可用
+        if service is None:
+            return jsonify({'success': False, 'error': '音乐生成服务不可用，请联系管理员'})
+            
+        # 重置进度
+        global generation_progress
+        generation_progress = {
+            'prompt_status': 0,
+            'music_status': 0
+        }
+        
+        print(f"开始根据描述生成情绪过渡音乐，情绪描述: '{emotion_text}', 时长: {transition_duration}秒")
+        
+        # 确保transition_duration是整数
+        try:
+            transition_duration = int(transition_duration)
+            if transition_duration < 5:
+                transition_duration = 5
+                print(f"过渡时长太短，已调整为最小值5秒")
+            elif transition_duration > 120:
+                transition_duration = 120
+                print(f"过渡时长太长，已调整为最大值120秒")
+        except ValueError:
+            transition_duration = 30
+            print(f"过渡时长格式无效，已设置为默认值30秒")
+        
+        # 首先使用API生成与情绪描述匹配的音乐提示词和情绪标签
+        generation_progress['prompt_status'] = 50
+        result = service.create_prompt(emotion_text)
+        
+        if not result:
+            generation_progress['prompt_status'] = 0
+            return jsonify({'success': False, 'error': '无法生成与情绪描述匹配的音乐提示词'})
+            
+        generation_progress['prompt_status'] = 100
+        from_emotion = result['emotion_label']
+        from_prompt = result['music_prompt']
+        
+        # 验证情绪标签
+        if from_emotion not in EMOTION_PRESET_PARAMS:
+            print(f"API返回的情绪标签 '{from_emotion}' 无效，使用默认情绪标签 'anxiety'")
+            from_emotion = "anxiety"
+        
+        # 固定目标情绪为calm (平静)
+        to_emotion = "calm"
+        
+        # 生成与用户情绪音乐相同BPM和key的平静音乐提示词
+        calm_prompt = f"Calm peaceful ambient music with the same BPM and key as the emotional music. Gentle piano melodies, soft pads, and soothing textures."
+        
+        print(f"识别情绪标签: '{from_emotion}'")
+        print(f"从情绪提示词: '{from_prompt}'")
+        print(f"到平静提示词: '{calm_prompt}'")
+        
+        # 生成过渡音乐
+        generation_progress['music_status'] = 10
+        success, audio_path, raw_audio_path, from_emotion_path, to_emotion_path = service.generate_transition_music(
+            from_emotion=from_emotion,
+            to_emotion=to_emotion,
+            from_prompt=from_prompt,
+            to_prompt=calm_prompt,
+            transition_duration=transition_duration
+        )
+        
+        if not success:
+            generation_progress['music_status'] = 0  # 重置进度
+            error_msg = "过渡音乐生成失败，请尝试使用不同的参数"
+            print(error_msg)
+            return jsonify({'success': False, 'error': error_msg})
+            
+        generation_progress['music_status'] = 100  # 只在成功时设置100%
+        
+        # 验证生成的文件是否存在
+        if not os.path.exists(audio_path) or not os.path.exists(raw_audio_path):
+            error_msg = "音频文件生成失败，文件不存在"
+            print(f"错误: {error_msg}, 音频路径: {audio_path}, 原始音频路径: {raw_audio_path}")
+            return jsonify({'success': False, 'error': error_msg})
+        
+        # 获取相对路径
+        audio_filename = os.path.basename(audio_path)
+        raw_audio_filename = os.path.basename(raw_audio_path)
+        relative_path = f'generated_music/{audio_filename}'
+        raw_relative_path = f'generated_music/{raw_audio_filename}'
+        
+        # 获取两段情绪音频的相对路径
+        from_emotion_filename = os.path.basename(from_emotion_path) if from_emotion_path else None
+        to_emotion_filename = os.path.basename(to_emotion_path) if to_emotion_path else None
+        from_emotion_relative_path = f'generated_music/{from_emotion_filename}' if from_emotion_filename else None
+        to_emotion_relative_path = f'generated_music/{to_emotion_filename}' if to_emotion_filename else None
+        
+        print(f"过渡音乐生成成功: {relative_path}")
+        
+        return jsonify({
+            'success': True,
+            'audio_path': relative_path,
+            'raw_audio_path': raw_relative_path,
+            'from_emotion_path': from_emotion_relative_path,
+            'to_emotion_path': to_emotion_relative_path,
+            'from_emotion': from_emotion,
+            'to_emotion': 'calm',
+            'stage': 'transition'
+        })
+        
+    except Exception as e:
+        generation_progress['music_status'] = 0  # 重置进度
+        error_msg = f"过渡音乐生成错误: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': error_msg})
 
 if __name__ == '__main__':
     # 确保静态文件目录存在

@@ -196,6 +196,25 @@ EMOTION_PRESET_PARAMS = {
             "target_db": -19.0,
             "limiter_threshold": -1.2
         }
+    },
+    "calm": {
+        "model_params": {
+            "temperature": 0.65,
+            "top_k": 150,
+            "cfg_coef": 3.0
+        },
+        "style_params": {
+            "eval_q": 2,
+            "excerpt_length": 4.0,
+            "ds_factor": 3
+        },
+        "audio_params": {
+            "low_shelf_gain": 0.0,
+            "mid_gain": 0.0,
+            "high_shelf_gain": -1.0,
+            "target_db": -20.0,
+            "limiter_threshold": -1.5
+        }
     }
 }
 
@@ -418,7 +437,7 @@ class MusicGenService:
                         '  "emotion_label": "emotion label",\n'
                         '  "music_prompt": "music generation prompt"\n'
                         "}\n\n"
-                        "The emotion label must be exactly one of: anxiety, depression, insomnia, stress, distraction, pain, trauma\n"
+                        "The emotion label must be exactly one of: anxiety, depression, insomnia, stress, distraction, pain, trauma, calm\n"
                         "The music prompt must:\n"
                         "- Be in English\n"
                         "- Include specific musical elements (rhythm, timbre, melodic features, etc.)\n"
@@ -501,7 +520,7 @@ class MusicGenService:
                 return None
             
             # Validate emotion label
-            valid_emotions = {'anxiety', 'depression', 'insomnia', 'stress', 'distraction', 'pain', 'trauma'}
+            valid_emotions = {'anxiety', 'depression', 'insomnia', 'stress', 'distraction', 'pain', 'trauma', 'calm'}
             if result['emotion_label'] not in valid_emotions:
                 self.logger.error(f"Invalid emotion label: {result['emotion_label']}")
                 self.logger.error(f"Valid emotions: {valid_emotions}")
@@ -559,7 +578,7 @@ class MusicGenService:
     
     def generate_transition_music(self, from_emotion: str, to_emotion: str, 
                                   from_prompt: str, to_prompt: str, 
-                                  transition_duration: int = 10) -> Tuple[bool, Optional[str], Optional[str]]:
+                                  transition_duration: int = 10) -> Tuple[bool, Optional[str], Optional[str], Optional[str], Optional[str]]:
         """
         生成情绪过渡音乐
         
@@ -571,20 +590,37 @@ class MusicGenService:
             transition_duration: 过渡音乐时长（秒）
             
         Returns:
-            Tuple[bool, Optional[str], Optional[str]]: (是否成功, 生成的音频文件路径, 原始音频文件路径)
+            Tuple[bool, Optional[str], Optional[str], Optional[str], Optional[str]]: 
+            (是否成功, 生成的音频文件路径, 原始音频文件路径, 起始情绪音频路径, 目标情绪音频路径)
         """
         if not self.model:
             self.logger.error("模型未初始化")
-            return False, None, None
+            return False, None, None, None, None
             
         try:
             # 确保transition_duration是整数
             transition_duration = int(transition_duration)
             
+            # 计算重叠比例为总时长的25%
+            overlap_ratio = 0.25
+            overlap_seconds = transition_duration * overlap_ratio
+            
+            # 计算每段音乐的实际时长，确保最终时长为用户指定的时长
+            # 两段生成的音频总时长 = 过渡总时长 + 重叠时长
+            total_segments_duration = transition_duration + overlap_seconds
+            
+            # 计算每段音频时长
+            first_segment_duration = int(total_segments_duration * 0.5)
+            second_segment_duration = int(total_segments_duration * 0.5)
+            
+            self.logger.info(f"总时长: {transition_duration}秒, 第一段: {first_segment_duration}秒, 第二段: {second_segment_duration}秒, 重叠时长: {overlap_seconds}秒")
+            
             # 生成唯一的文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = os.path.join(self.output_dir, f"transition_music_{timestamp}.wav")
             raw_output_file = os.path.join(self.output_dir, f"raw_transition_{timestamp}.wav")
+            from_emotion_file = os.path.join(self.output_dir, f"from_emotion_{timestamp}.wav")
+            to_emotion_file = os.path.join(self.output_dir, f"to_emotion_{timestamp}.wav")
             
             # 生成起始情绪音乐
             self.apply_emotion_preset(from_emotion)
@@ -593,7 +629,7 @@ class MusicGenService:
                 use_sampling=self.config.use_sampling,
                 top_k=from_params.get('top_k', self.config.top_k),
                 temperature=from_params.get('temperature', self.config.temperature),
-                duration=transition_duration // 2,  # 一半时间用于起始情绪
+                duration=first_segment_duration,
                 cfg_coef=from_params.get('cfg_coef', self.config.cfg_coef)
             )
             
@@ -609,7 +645,7 @@ class MusicGenService:
                 use_sampling=self.config.use_sampling,
                 top_k=to_params.get('top_k', self.config.top_k),
                 temperature=to_params.get('temperature', self.config.temperature),
-                duration=transition_duration // 2,  # 一半时间用于目标情绪
+                duration=second_segment_duration,
                 cfg_coef=to_params.get('cfg_coef', self.config.cfg_coef)
             )
             
@@ -621,6 +657,10 @@ class MusicGenService:
             # 处理音频数据
             from_audio = from_output[0].cpu().numpy()
             to_audio = to_output[0].cpu().numpy()
+            
+            # 检查生成的音频是否有效
+            self.logger.info(f"第一段音频形状: {from_audio.shape}, 第二段音频形状: {to_audio.shape}")
+            self.logger.info(f"第一段音频最大值: {np.max(np.abs(from_audio))}, 第二段音频最大值: {np.max(np.abs(to_audio))}")
             
             # 确保音频数据是2D的 [channels, samples]
             if from_audio.ndim == 3:
@@ -640,12 +680,81 @@ class MusicGenService:
             if to_audio.shape[0] > 1:
                 to_audio = to_audio.mean(axis=0, keepdims=True)
             
+            # 检查第二段音频是否含有有效数据
+            if np.max(np.abs(to_audio)) < 0.01:
+                self.logger.warning("第二段音频信号强度非常低，可能存在生成问题，重新生成")
+                
+                # 重新生成第二段音频
+                to_output = self.model.generate(
+                    descriptions=[to_prompt],
+                    progress=True
+                )
+                to_audio = to_output[0].cpu().numpy()
+                
+                # 再次确保格式正确
+                if to_audio.ndim == 3:
+                    to_audio = to_audio.squeeze(0)
+                if to_audio.ndim == 2 and to_audio.shape[1] < to_audio.shape[0]:
+                    to_audio = to_audio.T
+                if to_audio.shape[0] > 1:
+                    to_audio = to_audio.mean(axis=0, keepdims=True)
+                
+                self.logger.info(f"重新生成的第二段音频最大值: {np.max(np.abs(to_audio))}")
+            
+            # 保存两段原始情绪音频
+            # 为WAV写入准备音频数据 - 确保格式正确
+            if from_audio.ndim == 2:
+                from_audio_for_writing = from_audio.T if from_audio.shape[0] <= 2 else from_audio
+            else:
+                from_audio_for_writing = from_audio
+                
+            if to_audio.ndim == 2:
+                to_audio_for_writing = to_audio.T if to_audio.shape[0] <= 2 else to_audio
+            else:
+                to_audio_for_writing = to_audio
+            
+            # 保存起始情绪和目标情绪的音频
+            sf.write(
+                str(from_emotion_file),
+                from_audio_for_writing.astype(np.float32),
+                samplerate=self.config.sample_rate
+            )
+            sf.write(
+                str(to_emotion_file),
+                to_audio_for_writing.astype(np.float32),
+                samplerate=self.config.sample_rate
+            )
+            
             # 创建过渡音频 - 使用音频处理器创建平滑过渡
             transition_audio = self.audio_processor.create_transition(
                 from_audio, 
                 to_audio,
-                overlap_seconds=2.0  # 两秒重叠进行过渡
+                overlap_seconds=overlap_seconds  # 使用计算的重叠时长
             )
+            
+            # 检查最终音频的时长（样本数）
+            samples_per_second = self.config.sample_rate
+            expected_samples = transition_duration * samples_per_second
+            actual_samples = transition_audio.shape[1] if transition_audio.ndim == 2 else len(transition_audio)
+            
+            self.logger.info(f"期望样本数: {expected_samples}, 实际样本数: {actual_samples}")
+            
+            # 如果生成的音频长度与预期不符，进行调整
+            if abs(actual_samples - expected_samples) > samples_per_second:  # 允许1秒的误差
+                self.logger.warning(f"音频长度与预期不符，进行调整")
+                if actual_samples > expected_samples:
+                    # 截断过长的音频
+                    if transition_audio.ndim == 2:
+                        transition_audio = transition_audio[:, :expected_samples]
+                    else:
+                        transition_audio = transition_audio[:expected_samples]
+                else:
+                    # 填充过短的音频
+                    padding_length = expected_samples - actual_samples
+                    if transition_audio.ndim == 2:
+                        transition_audio = np.pad(transition_audio, ((0, 0), (0, padding_length)), mode='constant')
+                    else:
+                        transition_audio = np.pad(transition_audio, (0, padding_length), mode='constant')
             
             # 为WAV写入准备音频数据 - 确保格式正确
             if transition_audio.ndim == 2:
@@ -711,7 +820,7 @@ class MusicGenService:
             )
             
             self.logger.info(f"过渡音乐生成成功，保存至: {output_file}")
-            return True, output_file, raw_output_file
+            return True, output_file, raw_output_file, from_emotion_file, to_emotion_file
             
         except Exception as e:
             self.logger.error(f"过渡音乐生成失败: {str(e)}")
@@ -720,7 +829,7 @@ class MusicGenService:
                 self.logger.error(f"transition_audio shape: {transition_audio.shape}, dtype: {transition_audio.dtype}")
             if 'processed_audio' in locals():
                 self.logger.error(f"processed_audio shape: {processed_audio.shape}, dtype: {processed_audio.dtype}")
-            return False, None, None
+            return False, None, None, None, None
     
     def generate_music(self, prompt: str, eq_params: Optional[Dict[str, float]] = None, target_db: float = -20.0, limiter_threshold: float = -1.0) -> Tuple[bool, Optional[str], Optional[str]]:
         """
